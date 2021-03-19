@@ -127,7 +127,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
 
     if (i == 0)
     {
-      XrdCephEroute.Say("Initial read block",  currentBlock);
+      XrdCephEroute.Say("Initial read block",  std::to_string(currentBlock).c_str() );
       currentBlock = blockId;
     }
 
@@ -136,17 +136,17 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     // all cases for a flush
     if (blockId != currentBlock)
     {
-      XrdCephEroute.Say("blockId != currentBlock: ",  blockId, " " , currentBlock);
+      XrdCephEroute.Say("blockId != currentBlock: ",  std::to_string(blockId).c_str() , " " , std::to_string(currentBlock).c_str() );
       doFlush = true;
     }
     if (len > sizeRead)
     {
-      XrdCephEroute.Say("len > sizeRead: ",  len, " >  " , sizeRead);
+      XrdCephEroute.Say("len > sizeRead: ",  std::to_string(len).c_str() , " >  " , std::to_string(sizeRead).c_str() );
       doFlush = true;
     }
     else if (len + blockOff > sizeRead)
     {
-      XrdCephEroute.Say("len + blockOff > sizeRead: ",  len + blockOff, " >  " , sizeRead);
+      XrdCephEroute.Say("len + blockOff > sizeRead: ",  std::to_string(len + blockOff).c_str(), " >  " , std::to_string(sizeRead).c_str() );
       doFlush = true;
     }
 
@@ -158,7 +158,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
                             (off_t)(currentBlock * sizeRead),
                             (size_t)sizeRead);
       ++count_reads;
-      XrdCephEroute.Say("Flush: ", flush_curCount );
+      XrdCephEroute.Say("Flush: ", std::to_string(flush_curCount).c_str() );
       if (flush_curCount < 0)
       {
         return flush_curCount;
@@ -228,7 +228,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     flush_curCount = Read((void *)buffer,
                           (off_t)(currentBlock*sizeRead),
                           (size_t)sizeRead);
-    XrdCephEroute.Say("FlushEnd: ", flush_curCount );
+    XrdCephEroute.Say("FlushEnd: ", std::to_string(flush_curCount).c_str() );
 
     ++count_reads;
     if (flush_curCount < 0)
