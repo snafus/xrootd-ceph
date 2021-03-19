@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <vector>
 
 #include "XrdCeph/XrdCephPosix.hh"
 #include "XrdOuc/XrdOucEnv.hh"
@@ -87,26 +88,171 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   // first, find the associated CephFileRef for the file descrptor; we want the stripe info
   // for now, assume that 32k for each read request.
 
-  const size_t sizeRead = 32*1024;
+  const size_t sizeRead = 32 * 1024;
+  char buffer[sizeRead]; // allocate read buffer
+  XrdCephEroute.Say("JW: readV: ", std::to_string(n).c_str(), " in chunks of: ", std::to_string(sizeRead).c_str());
 
-    XrdCephEroute.Say("JW: readV: ", std::to_string(n).c_str() , std::to_string(sizeRead).c_str());
+  off_t currentBlock = 0;
+  std::vector<int> currentRequests;
+  std::vector<off_t> currentOffsets;
+  std::vector<ssize_t> currentSizes;
+
+  unsigned int count_flushes = 0;
+  unsigned int count_reads = 0;
+  unsigned int count_memcopy = 0;
+  unsigned int count_intrablock = 0;
+  unsigned int count_crossblock = 0;
+  unsigned int count_bigblock = 0;
+  unsigned int count_ = 0;
+
+  ssize_t nbytes = 0, curCount = 0;
+
+  for (int i = 0; i < n; i++)
+  {
+    // which block is the request in
+    off_t blockId = readV[i].offset % sizeRead;
+    // what is the offset within the block;
+    off_t blockOff = readV[i].offset - (sizeRead * blockId);
+    // what is the size of the request (which might extend over a block)
+    ssize_t len = readV[i].size;
+
+    if (i == 0)
+    {
+      currentBlock = blockId;
+    }
+
+    bool doFlush = false; // do we need to clear the results
+
+    // all cases for a flush
+    if (blockId != currentBlock)
+    {
+      doFlush = true;
+    }
+    if (len > sizeRead)
+    {
+      doFlush = true;
+    }
+    else if (len + blockOff > sizeRead)
+    {
+      doFlush = true;
+    }
+
+    if (doFlush)
+    {
+      ssize_t flush_nbytes = 0, flush_curCount = 0;
+      // read one block
+      flush_curCount = Read((void *)buffer,
+                            (off_t)currentBlock,
+                            (size_t)sizeRead);
+      if (flush_curCount < 0)
+      {
+        return flush_curCount;
+        //return -ESPIPE;
+      }
+      flush_nbytes += flush_curCount;
+
+      for (int iflush = 0; iflush < currentRequests.size(); ++iflush)
+      {
+        size_t irequest = currentRequests.at(iflush);
+        memcopy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
+        nbytes += currentSizes[irequest];
+      }
+      ++count_flushes;
+      currentRequests.clear();
+      currentOffsets.clear();
+      currentSizes.clear();
+    }
+
+    if (blockId != currentBlock)
+    {
+      // reset currentl block
+      currentBlock = blockId;
+    }
+
+    if (len > sizeRead)
+    {
+      // request is larger than one block size
+      //flush old requests
+      //FLUSH
+      // make this request as a single request (might not be any more efficiecnt ... )
+      ++count_bigblock;
+      currentRequests.push_back(i);
+      currentOffsets.push_back(blockOff);
+      currentSizes.push_back(len);
+      // on next loop, blockId will not be current block, and so will flush
+    }
+    else if (len + blockOff > sizeRead)
+    {
+      // request crosses block boundary, but is smaller that one whole block
+      //FLUSH
+      ++count_crossblock;
+      currentRequests.push_back(i);
+      currentOffsets.push_back(blockOff);
+      currentSizes.push_back(len);
+      // on next loop, blockId will not be current block, and so will flush
+    }
+    else
+    {
+      // request falls within one block
+      ++count_intrablock;
+      currentRequests.push_back(i);
+      currentOffsets.push_back(blockOff);
+      currentSizes.push_back(len);
+    }
+  } // end of for loop
+
+  // might still have unflushed data read,
+  if (currentRequests.size())
+  {
+    ssize_t flush_nbytes = 0, flush_curCount = 0;
+    // read one block
+    flush_curCount = Read((void *)buffer,
+                          (off_t)currentBlock,
+                          (size_t)sizeRead);
+    ++count_reads;
+    if (flush_curCount < 0)
+    {
+      return flush_curCount;
+      //return -ESPIPE;
+    }
+    flush_nbytes += flush_curCount;
+
+    for (int iflush = 0; iflush < currentRequests.size(); ++iflush)
+    {
+      size_t irequest = currentRequests.at(iflush);
+      memcopy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
+      nbytes += currentSizes[irequest];
+      ++count_memcopy;
+    }
+    ++count_flushes;
+    currentRequests.clear();
+    currentOffsets.clear();
+    currentSizes.clear();
+  } // end of final flush
+
+  //  ssize_t nbytes = 0, curCount = 0;
+  //  for (int i=0; i<n; i++)
+  //      {curCount = Read((void *)readV[i].data,
+  //                        (off_t)readV[i].offset,
+  //                       (size_t)readV[i].size);
+  //       if (curCount != readV[i].size)
+  //          {if (curCount < 0) return curCount;
+  //           return -ESPIPE;
+  //          }
+  //       nbytes += curCount;
+  //      }
 
 
+    XrdCephEroute.Say("JW: readV: count_flushes", std::to_string(count_flushes).c_str());
+    XrdCephEroute.Say("JW: readV: count_reads", std::to_string(count_reads).c_str());
+    XrdCephEroute.Say("JW: readV: count_memcopy", std::to_string(count_memcopy).c_str());
+    XrdCephEroute.Say("JW: readV: count_intrablock", std::to_string(count_intrablock).c_str());
+    XrdCephEroute.Say("JW: readV: count_crossblock", std::to_string(count_crossblock).c_str());
+    XrdCephEroute.Say("JW: readV: count_bigblock", std::to_string(count_bigblock).c_str());
 
-   ssize_t nbytes = 0, curCount = 0;
-   for (int i=0; i<n; i++)
-       {curCount = Read((void *)readV[i].data,
-                         (off_t)readV[i].offset,
-                        (size_t)readV[i].size);
-        if (curCount != readV[i].size)
-           {if (curCount < 0) return curCount;
-            return -ESPIPE;
-           }
-        nbytes += curCount;
-       }
-   return nbytes;
+
+  return nbytes;
 }
-
 
 int XrdCephOssFile::Fstat(struct stat *buff) {
   return ceph_posix_fstat(m_fd, buff);
