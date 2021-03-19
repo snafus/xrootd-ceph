@@ -97,6 +97,8 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   std::vector<int> currentRequests;
   std::vector<off_t> currentOffsets;
   std::vector<ssize_t> currentSizes;
+  std::vector<off_t> currentBufferOffset;
+
 
   unsigned int count_flushes = 0;
   unsigned int count_reads = 0;
@@ -104,12 +106,14 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   unsigned int count_intrablock = 0;
   unsigned int count_crossblock = 0;
   unsigned int count_bigblock = 0;
+  unsigned int count_readvitems = 0;
 
   ssize_t nbytes = 0;
   ssize_t flush_nbytes = 0;
 
   for (int i = 0; i < n; i++)
   {
+    ++count_readvitems;
     // which block is the request in
     off_t blockId = readV[i].offset /  sizeRead;
     // what is the offset within the block;
@@ -117,7 +121,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     // what is the size of the request (which might extend over a block)
     ssize_t len = readV[i].size;
 
-    XrdCephEroute.Say("JW: readV: In: Offset: ", std::to_string(readV[i].offset).c_str(), " size: ", std::to_string(readV[i].size).c_str());
+    XrdCephEroute.Say("JW: readV: In : Offset: ", std::to_string(readV[i].offset).c_str(), " size: ", std::to_string(readV[i].size).c_str());
     XrdCephEroute.Say("JW: readV: Out: blockId: ", std::to_string(blockId).c_str(), " blockOff: ", std::to_string(blockOff).c_str(), " size: ", std::to_string(len).c_str());
 
 
@@ -159,13 +163,14 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
       {
         size_t irequest = currentRequests.at(iflush);
-        memcpy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
+        memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[irequest]), (size_t)currentSizes[irequest]);
         nbytes += currentSizes[irequest];
       }
       ++count_flushes;
       currentRequests.clear();
       currentOffsets.clear();
       currentSizes.clear();
+      currentBufferOffset.clear();
     }
 
     if (blockId != currentBlock)
@@ -184,6 +189,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       currentRequests.push_back(i);
       currentOffsets.push_back(blockOff);
       currentSizes.push_back(len);
+      currentBufferOffset.push_back ( currentBufferOffset.size() ? currentBufferOffset.back() + currentSizes.back()  : 0); // starting offset in temp buffer
       // on next loop, blockId will not be current block, and so will flush
     }
     else if (len + blockOff > sizeRead)
@@ -194,6 +200,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       currentRequests.push_back(i);
       currentOffsets.push_back(blockOff);
       currentSizes.push_back(len);
+      currentBufferOffset.push_back ( currentBufferOffset.size() ? currentBufferOffset.back() + currentSizes.back()  : 0); // starting offset in temp buffer
       // on next loop, blockId will not be current block, and so will flush
     }
     else
@@ -203,6 +210,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       currentRequests.push_back(i);
       currentOffsets.push_back(blockOff);
       currentSizes.push_back(len);
+      currentBufferOffset.push_back ( currentBufferOffset.size() ? currentBufferOffset.back() + currentSizes.back()  : 0); // starting offset in temp buffer
     }
   } // end of for loop
 
@@ -225,7 +233,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
     {
       size_t irequest = currentRequests.at(iflush);
-      memcpy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
+      memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[irequest]), (size_t)currentSizes[irequest]);
       nbytes += currentSizes[irequest];
       ++count_memcopy;
     }
@@ -233,6 +241,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     currentRequests.clear();
     currentOffsets.clear();
     currentSizes.clear();
+    currentBufferOffset.clear();
   } // end of final flush
 
   //  ssize_t nbytes = 0, curCount = 0;
@@ -247,6 +256,8 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   //       nbytes += curCount;
   //      }
 
+count_readvitems
+    XrdCephEroute.Say("JW: readV: count_readvitems ", std::to_string(count_readvitems).c_str());
 
     XrdCephEroute.Say("JW: readV: count_flushes ", std::to_string(count_flushes).c_str());
     XrdCephEroute.Say("JW: readV: count_reads ", std::to_string(count_reads).c_str());
