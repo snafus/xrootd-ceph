@@ -169,11 +169,11 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
       {
         size_t irequest = currentRequests.at(iflush);
-        XrdCephEroute.Say("memcpy  : ", std::to_string(irequest).c_str(), " " , std::to_string(currentBufferOffset[irequest]).c_str());
-        XrdCephEroute.Say("memcpy2 : ", std::to_string(currentSizes[irequest]).c_str(), " " , std::to_string(iflush).c_str() );
+        XrdCephEroute.Say("memcpy  : ", std::to_string(irequest).c_str(), " " , std::to_string(currentBufferOffset[iflush]).c_str());
+        XrdCephEroute.Say("memcpy2 : ", std::to_string(currentSizes[iflush]).c_str(), " " , std::to_string(iflush).c_str() );
 
-        memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[irequest]), (size_t)currentSizes[irequest]);
-        nbytes += currentSizes[irequest];
+        memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[iflush]), (size_t)currentSizes[iflush]);
+        nbytes += currentSizes[iflush];
       }
       ++count_flushes;
       currentRequests.clear();
@@ -244,10 +244,10 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
     {
       size_t irequest = currentRequests.at(iflush);
-        XrdCephEroute.Say("memcpyEnd  : ", std::to_string(irequest).c_str(), " " , std::to_string(currentBufferOffset[irequest]).c_str());
-        XrdCephEroute.Say("memcpy2End : ", std::to_string(currentSizes[irequest]).c_str(), " " , std::to_string(iflush).c_str() );
-      memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[irequest]), (size_t)currentSizes[irequest]);
-      nbytes += currentSizes[irequest];
+        XrdCephEroute.Say("memcpyEnd  : ", std::to_string(irequest).c_str(), " " , std::to_string(currentBufferOffset[iflush]).c_str());
+        XrdCephEroute.Say("memcpy2End : ", std::to_string(currentSizes[iflush]).c_str(), " " , std::to_string(iflush).c_str() );
+      memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[iflush]), (size_t)currentSizes[iflush]);
+      nbytes += currentSizes[iflush];
       ++count_memcopy;
     }
     ++count_flushes;
