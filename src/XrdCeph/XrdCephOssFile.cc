@@ -256,7 +256,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   //       nbytes += curCount;
   //      }
 
-count_readvitems
+
     XrdCephEroute.Say("JW: readV: count_readvitems ", std::to_string(count_readvitems).c_str());
 
     XrdCephEroute.Say("JW: readV: count_flushes ", std::to_string(count_flushes).c_str());
