@@ -198,7 +198,8 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       currentRequests.push_back(i);
       currentOffsets.push_back(blockOff);
       currentSizes.push_back(len);
-      currentBufferOffset.push_back ( currentBufferOffset.size() ? currentBufferOffset.back() + currentSizes.back()  : 0); // starting offset in temp buffer
+      //currentBufferOffset.push_back ( currentBufferOffset.size() ? currentBufferOffset.back() + currentSizes.back()  : 0); // starting offset in temp buffer
+      currentBufferOffset.push_back(blockOff);
       // on next loop, blockId will not be current block, and so will flush
     }
     else if (len + blockOff > sizeRead)
@@ -226,10 +227,20 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     {
       // request falls within one block
       ++count_intrablock;
-      currentRequests.push_back(i);
-      currentOffsets.push_back(blockOff);
-      currentSizes.push_back(len);
-      currentBufferOffset.push_back ( currentBufferOffset.size() ? currentBufferOffset.back() + currentSizes.back()  : 0); // starting offset in temp buffer
+      ssize_t curCount = Read((void *)readV[i].data,
+                              (off_t)readV[i].offset,
+                              (size_t)readV[i].size);
+      if (curCount != readV[i].size)
+      {
+        if (curCount < 0)
+          return curCount;
+      }
+      nbytes += curCount;
+
+      // currentRequests.push_back(i);
+      // currentOffsets.push_back(blockOff);
+      // currentSizes.push_back(len);
+      // currentBufferOffset.push_back ( currentBufferOffset.size() ? currentBufferOffset.back() + currentSizes.back()  : 0); // starting offset in temp buffer
     }
   } // end of for loop
 
