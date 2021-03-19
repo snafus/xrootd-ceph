@@ -77,6 +77,19 @@ ssize_t XrdCephOssFile::ReadRaw(void *buff, off_t offset, size_t blen) {
 
 ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
 {
+  // Attempt to separate readV requests into a minimum set of read requests.
+  // Separate each readV into corresponding chuncks of Read request
+  // Make each read request, extract the neccessary bytes to put back into readV
+
+  // first, find the associated CephFileRef for the file descrptor; we want the stripe info
+  // for now, assume that 32k for each read request.
+
+  const size_t sizeRead = 32*1024;
+
+    XrdCephEroute.Say("JW: readV: ", n);
+
+
+
    ssize_t nbytes = 0, curCount = 0;
    for (int i=0; i<n; i++)
        {curCount = Read((void *)readV[i].data,
