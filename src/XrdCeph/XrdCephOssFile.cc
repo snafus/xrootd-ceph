@@ -169,6 +169,9 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
       {
         size_t irequest = currentRequests.at(iflush);
+        XrdCephEroute.Say("memcpy: ", std::to_string(irequest).c_str(), " " , std::to_string(currentBufferOffset[irequest])).c_str(), " " , 
+                                      std::to_string(currentSizes[irequest])).c_str(), " " , std::to_string(iflush).c_str(), " "  );
+
         memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[irequest]), (size_t)currentSizes[irequest]);
         nbytes += currentSizes[irequest];
       }
@@ -241,6 +244,8 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
     {
       size_t irequest = currentRequests.at(iflush);
+      XrdCephEroute.Say("memcpyEnd: ", std::to_string(irequest).c_str(), " " , std::to_string(currentBufferOffset[irequest])).c_str(), " " , 
+                                       std::to_string(currentSizes[irequest])).c_str(), " " , std::to_string(iflush).c_str(), " "  );
       memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[irequest]), (size_t)currentSizes[irequest]);
       nbytes += currentSizes[irequest];
       ++count_memcopy;
