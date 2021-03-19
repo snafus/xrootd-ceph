@@ -25,6 +25,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <string>
+
 #include "XrdCeph/XrdCephPosix.hh"
 #include "XrdOuc/XrdOucEnv.hh"
 #include "XrdSys/XrdSysError.hh"
@@ -33,6 +35,7 @@
 
 #include "XrdCeph/XrdCephOssFile.hh"
 #include "XrdCeph/XrdCephOss.hh"
+
 
 extern XrdSysError XrdCephEroute;
 
@@ -86,7 +89,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
 
   const size_t sizeRead = 32*1024;
 
-    XrdCephEroute.Say("JW: readV: ", n);
+    XrdCephEroute.Say("JW: readV: ", std::to_string(n).c_str() );
 
 
 
