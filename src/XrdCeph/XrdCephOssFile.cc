@@ -106,6 +106,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   unsigned int count_bigblock = 0;
 
   ssize_t nbytes = 0;
+  ssize_t flush_nbytes = 0;
 
   for (int i = 0; i < n; i++)
   {
@@ -115,6 +116,10 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     off_t blockOff = readV[i].offset - (sizeRead * blockId);
     // what is the size of the request (which might extend over a block)
     ssize_t len = readV[i].size;
+
+    XrdCephEroute.Say("JW: readV: In: Offset: ", std::to_string(readV[i].offset).c_str(), " size: ", std::to_string(readV[i].size).c_str());
+    XrdCephEroute.Say("JW: readV: Out: blockId: ", std::to_string(blockId).c_str(), " blockOff: ", std::to_string(blockOff).c_str(), " size: ", std::to_string(len).c_str());
+
 
     if (i == 0)
     {
@@ -137,9 +142,9 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       doFlush = true;
     }
 
-    if (doFlush)
+    if (doFlush && currentRequests.size())
     {
-      ssize_t flush_nbytes = 0, flush_curCount = 0;
+      ssize_t  flush_curCount = 0;
       // read one block
       flush_curCount = Read((void *)buffer,
                             (off_t)currentBlock,
@@ -204,7 +209,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   // might still have unflushed data read,
   if (currentRequests.size())
   {
-    ssize_t flush_nbytes = 0, flush_curCount = 0;
+    ssize_t  flush_curCount = 0;
     // read one block
     flush_curCount = Read((void *)buffer,
                           (off_t)currentBlock,
@@ -243,13 +248,17 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   //      }
 
 
-    XrdCephEroute.Say("JW: readV: count_flushes", std::to_string(count_flushes).c_str());
-    XrdCephEroute.Say("JW: readV: count_reads", std::to_string(count_reads).c_str());
-    XrdCephEroute.Say("JW: readV: count_memcopy", std::to_string(count_memcopy).c_str());
-    XrdCephEroute.Say("JW: readV: count_intrablock", std::to_string(count_intrablock).c_str());
-    XrdCephEroute.Say("JW: readV: count_crossblock", std::to_string(count_crossblock).c_str());
-    XrdCephEroute.Say("JW: readV: count_bigblock", std::to_string(count_bigblock).c_str());
+    XrdCephEroute.Say("JW: readV: count_flushes ", std::to_string(count_flushes).c_str());
+    XrdCephEroute.Say("JW: readV: count_reads ", std::to_string(count_reads).c_str());
+    XrdCephEroute.Say("JW: readV: count_memcopy ", std::to_string(count_memcopy).c_str());
+    XrdCephEroute.Say("JW: readV: count_intrablock ", std::to_string(count_intrablock).c_str());
+    XrdCephEroute.Say("JW: readV: count_crossblock ", std::to_string(count_crossblock).c_str());
+    XrdCephEroute.Say("JW: readV: count_bigblock ", std::to_string(count_bigblock).c_str());
 
+    XrdCephEroute.Say("JW: readV: flush_nbytes ", std::to_string(flush_nbytes).c_str());
+    XrdCephEroute.Say("JW: readV:       nbytes ", std::to_string(nbytes).c_str());
+
+      
 
   return nbytes;
 }
