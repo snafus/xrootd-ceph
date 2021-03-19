@@ -127,6 +127,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
 
     if (i == 0)
     {
+      XrdCephEroute.Say("Initial read block",  currentBlock);
       currentBlock = blockId;
     }
 
@@ -135,14 +136,17 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     // all cases for a flush
     if (blockId != currentBlock)
     {
+      XrdCephEroute.Say("blockId != currentBlock: ",  blockId, " " , currentBlock);
       doFlush = true;
     }
     if (len > sizeRead)
     {
+      XrdCephEroute.Say("len > sizeRead: ",  len, " >  " , sizeRead);
       doFlush = true;
     }
     else if (len + blockOff > sizeRead)
     {
+      XrdCephEroute.Say("len + blockOff > sizeRead: ",  len + blockOff, " >  " , sizeRead);
       doFlush = true;
     }
 
@@ -151,8 +155,10 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       ssize_t  flush_curCount = 0;
       // read one block
       flush_curCount = Read((void *)buffer,
-                            (off_t)currentBlock,
+                            (off_t)(currentBlock * sizeRead),
                             (size_t)sizeRead);
+      ++count_reads;
+      XrdCephEroute.Say("Flush: ", flush_curCount );
       if (flush_curCount < 0)
       {
         return flush_curCount;
@@ -220,8 +226,10 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     ssize_t  flush_curCount = 0;
     // read one block
     flush_curCount = Read((void *)buffer,
-                          (off_t)currentBlock,
+                          (off_t)(currentBlock*sizeRead),
                           (size_t)sizeRead);
+    XrdCephEroute.Say("FlushEnd: ", flush_curCount );
+
     ++count_reads;
     if (flush_curCount < 0)
     {
