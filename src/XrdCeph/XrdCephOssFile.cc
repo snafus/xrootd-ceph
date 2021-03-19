@@ -27,6 +27,7 @@
 
 #include <string>
 #include <vector>
+#include <stdio.h>
 
 #include "XrdCeph/XrdCephPosix.hh"
 #include "XrdOuc/XrdOucEnv.hh"
@@ -88,7 +89,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   // first, find the associated CephFileRef for the file descrptor; we want the stripe info
   // for now, assume that 32k for each read request.
 
-  const size_t sizeRead = 32 * 1024;
+  const ssize_t sizeRead = 32 * 1024;
   char buffer[sizeRead]; // allocate read buffer
   XrdCephEroute.Say("JW: readV: ", std::to_string(n).c_str(), " in chunks of: ", std::to_string(sizeRead).c_str());
 
@@ -220,7 +221,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     for (int iflush = 0; iflush < currentRequests.size(); ++iflush)
     {
       size_t irequest = currentRequests.at(iflush);
-      memcopy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
+      memcpy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
       nbytes += currentSizes[irequest];
       ++count_memcopy;
     }
