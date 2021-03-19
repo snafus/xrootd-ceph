@@ -89,7 +89,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
 
   const size_t sizeRead = 32*1024;
 
-    XrdCephEroute.Say("JW: readV: ", std::to_string(n).c_str() );
+    XrdCephEroute.Say("JW: readV: ", std::to_string(n).c_str() , std::to_string(sizeRead).c_str());
 
 
 
