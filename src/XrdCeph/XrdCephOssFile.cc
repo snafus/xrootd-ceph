@@ -104,9 +104,8 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   unsigned int count_intrablock = 0;
   unsigned int count_crossblock = 0;
   unsigned int count_bigblock = 0;
-  unsigned int count_ = 0;
 
-  ssize_t nbytes = 0, curCount = 0;
+  ssize_t nbytes = 0;
 
   for (int i = 0; i < n; i++)
   {
@@ -152,10 +151,10 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
       }
       flush_nbytes += flush_curCount;
 
-      for (int iflush = 0; iflush < currentRequests.size(); ++iflush)
+      for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
       {
         size_t irequest = currentRequests.at(iflush);
-        memcopy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
+        memcpy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
         nbytes += currentSizes[irequest];
       }
       ++count_flushes;
@@ -218,7 +217,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
     }
     flush_nbytes += flush_curCount;
 
-    for (int iflush = 0; iflush < currentRequests.size(); ++iflush)
+    for (size_t iflush = 0; iflush < currentRequests.size(); ++iflush)
     {
       size_t irequest = currentRequests.at(iflush);
       memcpy((void *)readV[irequest].data, (void *)(buffer + currentOffsets[irequest]), (size_t)currentSizes[irequest]);
