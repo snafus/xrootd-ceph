@@ -111,9 +111,9 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
   for (int i = 0; i < n; i++)
   {
     // which block is the request in
-    off_t blockId = readV[i].offset % sizeRead;
+    off_t blockId = readV[i].offset /  sizeRead;
     // what is the offset within the block;
-    off_t blockOff = readV[i].offset - (sizeRead * blockId);
+    off_t blockOff = readV[i].offset % sizeRead;
     // what is the size of the request (which might extend over a block)
     ssize_t len = readV[i].size;
 
