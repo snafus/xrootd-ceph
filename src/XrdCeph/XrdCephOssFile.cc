@@ -111,6 +111,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
 
   ssize_t nbytes = 0;
   ssize_t flush_nbytes = 0;
+  ssize_t immediate_nbytes = 0;
 
   for (int i = 0; i < n; i++)
   {
@@ -174,6 +175,7 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
         XrdCephEroute.Say("memcpy2 : ", std::to_string(currentSizes[iflush]).c_str(), " " , std::to_string(iflush).c_str() );
 
         memcpy((void *)readV[irequest].data, (void *)(buffer + currentBufferOffset[iflush]), (size_t)currentSizes[iflush]);
+        ++count_memcopy;
         nbytes += currentSizes[iflush];
       }
       ++count_flushes;
@@ -199,12 +201,14 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
                               (off_t)readV[i].offset,
                               (size_t)readV[i].size);
       ++count_immediatereads;
+      ++count_reads;
       if (curCount != readV[i].size)
       {
         if (curCount < 0)
           return curCount;
       }
       nbytes += curCount;
+      immediate_nbytes += curCount;
       ++count_bigblock;
       // currentRequests.push_back(i);
       // currentOffsets.push_back(blockOff);
@@ -222,12 +226,14 @@ ssize_t XrdCephOssFile::ReadV(XrdOucIOVec *readV, int n)
                               (off_t)readV[i].offset,
                               (size_t)readV[i].size);
       ++count_immediatereads;
+      ++count_reads;
       if (curCount != readV[i].size)
       {
         if (curCount < 0)
           return curCount;
       }
       nbytes += curCount;
+      immediate_nbytes += curCount;
 
       // currentRequests.push_back(i);
       // currentOffsets.push_back(blockOff);
