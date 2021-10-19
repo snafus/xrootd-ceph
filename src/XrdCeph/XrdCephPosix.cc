@@ -1281,7 +1281,7 @@ int ceph_posix_unlink(XrdOucEnv* env, const char *pathname) {
     return rc; 
   }
   // if EBUSY returned, assume the file is locked; so try to remove the lock
-  logwrapper((char*)"ceph_posix_unlink : unlink failed with -EBUSY %s", pathname);  
+  logwrapper((char*)"ceph_posix_unlink : unlink failed with -EBUSY %s, now trying to remove lock.", pathname);  
 
   // lock name is only exposed in the libradosstriper source file, so hardcode it here. 
   rc = ceph_posix_internal_removexattr(file, "lock.striper.lock");
@@ -1293,7 +1293,9 @@ int ceph_posix_unlink(XrdOucEnv* env, const char *pathname) {
   // now try to remove again
   rc = striper->remove(file.name);
   if (rc != 0) {
-    logwrapper((char*)"ceph_posix_unlink : unlink second attempt failed %s, %d", pathname, rc);
+    logwrapper((char*)"ceph_posix_unlink : unlink failed after lock removal %s, %d", pathname, rc);
+  } else {
+    logwrapper((char*)"ceph_posix_unlink : unlink suceeded after lock removal %s, %d", pathname, rc);
   }
   return rc; 
 }
