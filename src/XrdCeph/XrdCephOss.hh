@@ -71,6 +71,9 @@ public:
   virtual XrdOssDF *newDir(const char *tident);
   virtual XrdOssDF *newFile(const char *tident);
 
+  private:
+    bool m_configBufferEnable=false;
+    size_t m_configBufferSize=16*1024*1024L; 
 };
 
 #endif /* __CEPH_OSS_HH__ */

@@ -22,39 +22,29 @@
 // or submit itself to any jurisdiction.
 //------------------------------------------------------------------------------
 
-#ifndef __XRD_CEPH_OSS_FILE_HH__
-#define __XRD_CEPH_OSS_FILE_HH__
+#ifndef __XRD_CEPH_OSS_BUFFERED_FILE_HH__
+#define __XRD_CEPH_OSS_BUFFERED_FILE_HH__
 
 #include "XrdOss/XrdOss.hh"
 #include "XrdCeph/XrdCephOss.hh"
 
+#include "XrdCeph/XrdCephBuffers/IXrdCephBufferData.hh"
+#include "XrdCeph/XrdCephBuffers/IXrdCephBufferAlg.hh"
+#include "XrdCeph/XrdCephBuffers/IXrdCephReadVAdapter.hh"
+
+
 //------------------------------------------------------------------------------
-//! This class implements XrdOssDF interface for usage with a CEPH storage.
-//!
-//! This plugin is able to use any pool of ceph with any userId.
-//! There are several ways to provide the pool and userId to be used for a given
-//! operation. Here is the ordered list of possibilities.
-//! First one defined wins :
-//!   - the path can be prepended with userId and pool. Syntax is :
-//!       [[userId@]pool:]<actual path>
-//!   - the XrdOucEnv parameter, when existing, can have 'cephUserId' and/or
-//!     'cephPool' entries
-//!   - the ofs.osslib directive can provide an argument with format :
-//!       [userID@]pool
-//!   - default are 'admin' and 'default' for userId and pool respectively
-//!
-//! Note that the definition of a default via the ofs.osslib directive may
-//! clash with one used in a ofs.xattrlib directive. In case both directives
-//! have a default and they are different, the behavior is not defined.
-//! In case one of the two only has a default, it will be applied for both plugins.
+//! Decorator class XrdCephOssBufferedFile designed to wrap XrdCephOssFile
+//! Functionality for buffered access to/from data in Ceph to avoid inefficient
+//! small reads / writes from the client side
 //------------------------------------------------------------------------------
 
-class XrdCephOssFile : public XrdOssDF {
+class XrdCephOssBufferedFile : public XrdOssDF {
 
 public:
 
-  XrdCephOssFile(XrdCephOss *cephoss);
-  virtual ~XrdCephOssFile() {};
+  XrdCephOssBufferedFile(XrdCephOssFile *cephossDF, size_t buffersize); 
+  virtual ~XrdCephOssBufferedFile();
   virtual int Open(const char *path, int flags, mode_t mode, XrdOucEnv &env);
   virtual int Close(long long *retsz=0);
   virtual ssize_t Read(off_t offset, size_t blen);
@@ -67,12 +57,11 @@ public:
   virtual int Fsync(void);
   virtual int Ftruncate(unsigned long long);
 
-  inline int getFileDescriptor() const {return m_fd;}
-private:
-
-  int m_fd;
-  XrdCephOss *m_cephOss;
-
+protected:
+  XrdCephOssFile * m_xrdOssDF = nullptr; // holder of the XrdCephOssFile instance
+  XrdCephBuffer::IXrdCephBufferAlg * m_bufferAlg = nullptr;
+  int m_flags = 0;
+  size_t m_bufsize = 16*1024*1024L;
 };
 
-#endif /* __XRD_CEPH_OSS_FILE_HH__ */
+#endif /* __XRD_CEPH_OSS_BUFFERED_FILE_HH__ */

@@ -41,6 +41,7 @@
 #include "XrdCeph/XrdCephOss.hh"
 #include "XrdCeph/XrdCephOssDir.hh"
 #include "XrdCeph/XrdCephOssFile.hh"
+#include "XrdCeph/XrdCephOssBufferedFile.hh"
 
 XrdVERSIONINFO(XrdOssGetStorageSystem, XrdCephOss);
 
@@ -144,7 +145,39 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
            return 1;
          }
        }
-     }
+        if (!strncmp(var, "ceph.usebuffer", 14)) { // allowable values: 0, 1
+         var = Config.GetWord();
+         if (var) {
+           unsigned long value = strtoul(var, 0, 10);
+           if (value <= 1) {
+             m_configBufferEnable = value;
+             Eroute.Emsg("Config", "ceph.usebuffer",std::to_string(m_configBufferEnable).c_str());
+           } else {
+             Eroute.Emsg("Config", "Invalid value for ceph.usebuffer in config file (must be 0 or 1)", configfn, var);
+             return 1;
+           }
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.usebuffer in config file", configfn);
+           return 1;
+         }
+       } // usebuffer
+        if (!strncmp(var, "ceph.buffersize", 15)) { // size in bytes
+         var = Config.GetWord();
+         if (var) {
+           unsigned long value = strtoul(var, 0, 10);
+           if (value > 0 and value <= 1000000000L) {
+             m_configBufferSize = value;
+            Eroute.Emsg("Config", "ceph.buffersize", std::to_string(m_configBufferSize).c_str() ); 
+           } else {
+             Eroute.Emsg("Config", "Invalid value for ceph.buffersize in config file; enter in bytes (no units)", configfn, var);
+             return 1;
+           }
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.buffersize in config file", configfn);
+           return 1;
+         }
+       } // usebuffer
+     } // while
 
      // Now check if any errors occured during file i/o
      int retc = Config.LastError();
@@ -254,6 +287,13 @@ XrdOssDF* XrdCephOss::newDir(const char *tident) {
 }
 
 XrdOssDF* XrdCephOss::newFile(const char *tident) {
-  return new XrdCephOssFile(this);
+  //TODO create a config to setup the file type and buffer size, etc.
+  //return new XrdCephOssFile(this);
+  // base instance
+  XrdCephOssFile  * xrdCephOssDF =  new XrdCephOssFile(this);
+  if (!m_configBufferEnable) return xrdCephOssDF;
+  XrdCephEroute.Say("Ceph Buffermode enabled : size: ", std::to_string(m_configBufferSize).c_str() );
+  // wrap with buffer layer and return
+  return new XrdCephOssBufferedFile(xrdCephOssDF, m_configBufferSize);
 }
 
