@@ -64,10 +64,10 @@ ssize_t XrdCephBufferDataSimple::readBuffer(void* buf, off_t offset, size_t blen
     // returns -ve value on error, else the actual number of bytes read
 
     if (!m_valid) {
-        return -1;
+        return -EINVAL;
     }
     if (offset < 0) {
-        return -1;
+        return -EINVAL;
     }
     if (offset > (ssize_t) m_bufLength) {
         return 0;
@@ -78,7 +78,7 @@ ssize_t XrdCephBufferDataSimple::readBuffer(void* buf, off_t offset, size_t blen
     }
     //std::cout << readlength << " " << blen << " " << m_bufLength << " " << offset << std::endl;
     if (readlength <0) {
-        return -1;
+        return -EINVAL;
     }
 
     if (readlength == 0) {
@@ -99,18 +99,18 @@ ssize_t XrdCephBufferDataSimple::writeBuffer(const void* buf, off_t offset, size
     //invalidate();
 
     if (offset < 0) {
-        return -1;
+        return -EINVAL;
     }
 
     ssize_t cap = capacity();
     if ((ssize_t)blen > cap) {
-        return -1;
+        return -EINVAL;
     }
     if ((ssize_t)offset > cap) {
-        return -1;
+        return -EINVAL;
     }
     if (ssize_t(offset + blen) > cap) {
-        return -1;
+        return -EINVAL;
     }
 
     std::vector<char>::iterator itstart = m_buffer.begin();

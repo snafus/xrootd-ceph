@@ -31,9 +31,9 @@ XrdCephBufferAlgSimple::~XrdCephBufferAlgSimple() {
 
 
 ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
-    ssize_t rc(-1);
+    ssize_t rc(-ENOSYS);
     if (!aoip) {
-        return -1; // #TODO
+        return -EINVAL; 
     }
 
     volatile void  * buf  = aoip->sfsAio.aio_buf;
@@ -51,10 +51,10 @@ ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
 }
 
 ssize_t XrdCephBufferAlgSimple::write_aio(XrdSfsAio *aoip) {
-    ssize_t rc(-ENOTSUP);
-        // if (!aoip) {
-        //     return -1; 
-        // }
+    ssize_t rc(-ENOSYS);
+        if (!aoip) {
+             return -EINVAL; 
+         }
 
         // volatile void  * buf  = aoip->sfsAio.aio_buf;
         // size_t blen  = aoip->sfsAio.aio_nbytes;
@@ -123,7 +123,7 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
         rc =  m_bufferdata->readBuffer( (void*) &(((char*)buf)[offsetDelta]) , bufPosition  + offsetDelta , bytesRemaining);
         if (rc < 0 ) {
             std::clog << "Reading from Cache Failed: " << rc << "  " << offsetDelta << "  " << bytesRemaining << std::endl;
-            return -1; // TODO return correct errors
+            return rc; // TODO return correct errors
         }
         if (rc == 0) {
             // no bytes returned; much be at end of file
@@ -164,6 +164,10 @@ ssize_t XrdCephBufferAlgSimple::write (const void *buf, off_t offset, size_t ble
         //     return rc; // TODO return correct errors
         // }
     } // mismatched offset
+
+    if ( (m_bufferStartingOffset % m_bufferdata->capacity()) != 0 ) {
+        std::clog << " Non aligned offset?" << m_bufferStartingOffset << " " <<  m_bufferdata->capacity() << " " <<  m_bufferStartingOffset % m_bufferdata->capacity() << std::endl;
+    }
 
     // if (blen >= m_bufferdata->capacity()) {
     //     // TODO, might be dangerous to flush the cache on non-aligned writes ... 
@@ -252,9 +256,9 @@ ssize_t XrdCephBufferAlgSimple::flushWriteCache()  {
 
 
 ssize_t XrdCephBufferAlgSimple::rawRead (void *buf,       off_t offset, size_t blen) {
-    return -1;
+    return -ENOSYS;
 }
 
 ssize_t XrdCephBufferAlgSimple::rawWrite(void *buf,       off_t offset, size_t blen) {
-    return -1;
+    return -ENOSYS;
 }

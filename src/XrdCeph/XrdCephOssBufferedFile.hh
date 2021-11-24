@@ -61,7 +61,7 @@ protected:
   XrdCephOssFile * m_xrdOssDF = nullptr; // holder of the XrdCephOssFile instance
   XrdCephBuffer::IXrdCephBufferAlg * m_bufferAlg = nullptr;
   int m_flags = 0;
-  size_t m_bufsize = 16*1024*1024L;
+  size_t m_bufsize = 16*1024*1024L; // default 16MiB size
 };
 
 #endif /* __XRD_CEPH_OSS_BUFFERED_FILE_HH__ */
