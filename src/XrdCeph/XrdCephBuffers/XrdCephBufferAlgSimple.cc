@@ -22,15 +22,21 @@ m_bufferdata(buffer), m_cephio(cephio), m_fd(fd){
 }
 
 XrdCephBufferAlgSimple::~XrdCephBufferAlgSimple() {
+        std::clog << "XrdCephBufferAlgSimple::Destructor fd:" << m_fd << std::endl;
     if (m_bufferdata) {
         delete m_bufferdata;
         m_bufferdata = nullptr;
     }
+    if (m_cephio) {
+        delete m_cephio;
+        m_cephio = nullptr;
+    }    
     m_fd = -1;
 }
 
 
 ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
+    return -ENOSYS;
     ssize_t rc(-ENOSYS);
     if (!aoip) {
         return -EINVAL; 
@@ -51,6 +57,7 @@ ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
 }
 
 ssize_t XrdCephBufferAlgSimple::write_aio(XrdSfsAio *aoip) {
+    return -ENOSYS;
     ssize_t rc(-ENOSYS);
         if (!aoip) {
              return -EINVAL; 

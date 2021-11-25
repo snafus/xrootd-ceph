@@ -49,6 +49,8 @@ m_xrdOssDF(cephossDF), m_bufsize(buffersize) {
 }
 
 XrdCephOssBufferedFile::~XrdCephOssBufferedFile() {
+    XrdCephEroute.Say("XrdCephOssBufferedFile::Destructor");
+
   // call the destructor of wrapped and delegated classes:
   if (m_bufferAlg) {
     delete m_bufferAlg;
@@ -77,7 +79,8 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
   // TODO; check for deletion memory leaks
   m_bufferAlg = new XrdCephBufferAlgSimple(cephbuffer,cephio,m_xrdOssDF->getFileDescriptor());
   std::stringstream msg; 
-  msg << "XrdCephOssBufferedFile::Open: Buffer created: " << cephbuffer->capacity();
+  msg << "XrdCephOssBufferedFile::Open: fd: " << m_xrdOssDF->getFileDescriptor() 
+        <<  ". Buffer created: " << cephbuffer->capacity();
   XrdCephEroute.Say(msg.str().c_str());
 
 
@@ -89,14 +92,14 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
     ssize_t rc = m_bufferAlg->flushWriteCache();
     if (rc < 0) {
         std::stringstream msg; 
-        msg << "XrdCephOssBufferedFile::Close: flush ";
+        msg << "XrdCephOssBufferedFile::Close: flush  fd: " << m_xrdOssDF->getFileDescriptor() ;
         XrdCephEroute.Say(msg.str().c_str());
         return rc;
     }
   } // check for write
   // TODO delete cephio, etc
   
-  if (m_bufferAlg) {
+  if (m_bufferAlg) { // #TODO mem leak if not relased ?
     delete m_bufferAlg;
     m_bufferAlg = nullptr;
   }
@@ -119,7 +122,7 @@ ssize_t XrdCephOssBufferedFile::Read(void *buff, off_t offset, size_t blen) {
 
 int XrdCephOssBufferedFile::Read(XrdSfsAio *aiop) {
 
-  std::stringstream msg; msg << "XrdCephOssBufferedFile::AIOREAD: "  << time(nullptr) << " : " 
+  std::stringstream msg; msg << "XrdCephOssBufferedFile::AIOREAD: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  << time(nullptr) << " : " 
           << aiop->sfsAio.aio_offset << " " 
           << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
           << aiop->sfsAio.aio_fildes << " " ;
@@ -140,13 +143,13 @@ int XrdCephOssBufferedFile::Fstat(struct stat *buff) {
 
 ssize_t XrdCephOssBufferedFile::Write(const void *buff, off_t offset, size_t blen) {
   //return m_xrdOssDF->Write(buff, offset,blen );
-  std::stringstream msg; msg << "XrdCephOssBufferedFile::Write: " <<  offset << "  " << blen;
+  std::stringstream msg; msg << "XrdCephOssBufferedFile::Write: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  <<  offset << "  " << blen;
   XrdCephEroute.Say(msg.str().c_str());
   return m_bufferAlg->write(buff, offset, blen);
 }
 
 int XrdCephOssBufferedFile::Write(XrdSfsAio *aiop) {
-  std::stringstream msg; msg << "XrdCephOssBufferedFile::AIOWRITE: "  << time(nullptr) << " : " 
+  std::stringstream msg; msg << "XrdCephOssBufferedFile::AIOWRITE: fd: " << m_xrdOssDF->getFileDescriptor() << "  "   << time(nullptr) << " : " 
           << aiop->sfsAio.aio_offset << " " 
           << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
           << aiop->sfsAio.aio_fildes << " " ;
