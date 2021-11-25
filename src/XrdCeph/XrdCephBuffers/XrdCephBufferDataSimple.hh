@@ -8,6 +8,8 @@
 #include "IXrdCephBufferData.hh"
 
 #include <vector>
+#include <atomic>
+#include <chrono>
 
 namespace XrdCephBuffer {
 
@@ -40,6 +42,13 @@ class XrdCephBufferDataSimple :  public virtual IXrdCephBufferData
         std::vector<char> m_buffer; // actual physical buffer
         off_t m_externalOffset = 0; //! what does the first byte of the buffer map to for external offsets
         size_t m_bufLength = 0;  //! length of valid stored data; might be less than the capacity
+
+        // timer and counter info
+        std::atomic< long> m_stats_read_timer{0}, m_stats_write_timer{0};
+        std::atomic< long> m_stats_read_bytes{0}, m_stats_write_bytes{0};
+        std::atomic< long> m_stats_read_req{0},   m_stats_write_req{0};
+        long m_stats_read_longest{0}, m_stats_write_longest{0};
+
 
 }; // XrdCephBufferDataSimple
 

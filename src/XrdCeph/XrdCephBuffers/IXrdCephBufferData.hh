@@ -33,6 +33,7 @@ class IXrdCephBufferData {
 
 
     protected:
+    
 };
 
 }

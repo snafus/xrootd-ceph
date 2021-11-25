@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <iostream>
 
+
 using  namespace XrdCephBuffer;
 
 
@@ -87,7 +88,12 @@ ssize_t XrdCephBufferDataSimple::readBuffer(void* buf, off_t offset, size_t blen
     
     std::vector<char>::const_iterator itstart = m_buffer.cbegin();
 
+    auto start = std::chrono::steady_clock::now();
     std::copy( itstart+offset, itstart+(offset+readlength), (char*)buf);
+    auto end = std::chrono::steady_clock::now();
+    auto int_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
+    std::clog << "XrdCephBufferDataSimple::readBuffer: " << offset << " " << readlength << " " << int_ns.count() << std::endl;
+
     return readlength;
 }
 
@@ -116,7 +122,13 @@ ssize_t XrdCephBufferDataSimple::writeBuffer(const void* buf, off_t offset, size
     std::vector<char>::iterator itstart = m_buffer.begin();
     size_t readBytes = blen;
 
+    auto start = std::chrono::steady_clock::now();
     std::copy((char*)buf, (char*)buf +readBytes ,itstart + offset );
+    auto end = std::chrono::steady_clock::now();
+    auto int_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
+    std::clog << "XrdCephBufferDataSimple::writeBuffer: " << offset << " " << readBytes << " " << int_ns.count() << std::endl;
+
+
 
     m_externalOffset = externalOffset;
     // Decide to set the length of the maximum value that has be written
