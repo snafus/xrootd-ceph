@@ -50,7 +50,7 @@ add_library(
   XrdCeph/XrdCephBuffers/XrdCephBufferDataSimple.cc XrdCeph/XrdCephBuffers/XrdCephBufferDataSimple.hh
   XrdCeph/XrdCephBuffers/XrdCephBufferAlgSimple.cc  XrdCeph/XrdCephBuffers/XrdCephBufferAlgSimple.hh 
   XrdCeph/XrdCephBuffers/CephIOAdapterRaw.cc  XrdCeph/XrdCephBuffers/CephIOAdapterRaw.hh
-  XrdCeph/XrdCephBuffers/CephIOAdapterRaw.cc  XrdCeph/XrdCephBuffers/CephIOAdapterRaw.hh
+  XrdCeph/XrdCephBuffers/BufferUtils.cc  XrdCeph/XrdCephBuffers/BufferUtils.hh
 )
 
 target_link_libraries(
