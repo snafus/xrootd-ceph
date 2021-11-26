@@ -3,8 +3,12 @@
 //------------------------------------------------------------------------------
 
 #include "XrdCephBufferDataSimple.hh"
+#include "BufferUtils.hh"
 //#include "XrdCeph/XrdCephBuffers/IXrdCephBufferData.hh"
 #include <errno.h>
+#include <memory.h>
+#include <stdio.h>
+#include <string.h>
 #include <algorithm>
 #include <iostream>
 
@@ -86,13 +90,14 @@ ssize_t XrdCephBufferDataSimple::readBuffer(void* buf, off_t offset, size_t blen
         return 0;
     }
     
-    std::vector<char>::const_iterator itstart = m_buffer.cbegin();
+    const char* rawbufstart = m_buffer.data();
 
-    auto start = std::chrono::steady_clock::now();
-    std::copy( itstart+offset, itstart+(offset+readlength), (char*)buf);
-    auto end = std::chrono::steady_clock::now();
-    auto int_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
-    std::clog << "XrdCephBufferDataSimple::readBuffer: " << offset << " " << readlength << " " << int_ns.count() << std::endl;
+    long int_ns{0};
+    {auto t = Timer_ns(int_ns);
+        // std::copy(rawbufstart + offset, rawbufstart+offset+readlength, reinterpret_cast<char*>(buf) );
+        memcpy(reinterpret_cast<char*>(buf), rawbufstart + offset, readlength);
+    } // end Timer
+    std::clog << "XrdCephBufferDataSimple::readBuffer: " << offset << " " << readlength << " " << int_ns<< std::endl;
 
     return readlength;
 }
@@ -119,14 +124,19 @@ ssize_t XrdCephBufferDataSimple::writeBuffer(const void* buf, off_t offset, size
         return -EINVAL;
     }
 
-    std::vector<char>::iterator itstart = m_buffer.begin();
+    // std::vector<char>::iterator itstart = m_buffer.begin();
     size_t readBytes = blen;
+    char* rawbufstart = m_buffer.data();
 
-    auto start = std::chrono::steady_clock::now();
-    std::copy((char*)buf, (char*)buf +readBytes ,itstart + offset );
-    auto end = std::chrono::steady_clock::now();
-    auto int_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
-    std::clog << "XrdCephBufferDataSimple::writeBuffer: " << offset << " " << readBytes << " " << int_ns.count() << std::endl;
+
+    long int_ns{0};
+    {auto t = Timer_ns(int_ns);
+      //std::copy((char*)buf, (char*)buf +readBytes ,itstart + offset );
+      memcpy(rawbufstart + offset, buf, readBytes);
+
+    } // end Timer
+
+    std::clog << "XrdCephBufferDataSimple::writeBuffer: " << offset << " " << readBytes << " " << int_ns << std::endl;
 
 
 

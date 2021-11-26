@@ -52,10 +52,11 @@ XrdCephOssBufferedFile::~XrdCephOssBufferedFile() {
     XrdCephEroute.Say("XrdCephOssBufferedFile::Destructor");
 
   // call the destructor of wrapped and delegated classes:
-  if (m_bufferAlg) {
-    delete m_bufferAlg;
-    m_bufferAlg = nullptr;
-  }
+  // Using std::unique should make this redundant
+  // if (m_bufferAlg) {
+  //   delete m_bufferAlg;
+  //   m_bufferAlg = nullptr;
+  // }
 
   if (m_xrdOssDF) {
     delete m_xrdOssDF;
@@ -73,15 +74,23 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
   m_flags = flags; // e.g. for write/read knowledge
 
   // opened a file, so create the buffer here; note - this might be better delegated elswhere ...
-  // need the file descriptor, so do it after we know the file is opened 
-  IXrdCephBufferData * cephbuffer = new XrdCephBufferDataSimple(m_bufsize);
-  ICephIOAdapter * cephio =  new CephIOAdapterRaw(cephbuffer,m_xrdOssDF->getFileDescriptor()  );
-  // TODO; check for deletion memory leaks
-  m_bufferAlg = new XrdCephBufferAlgSimple(cephbuffer,cephio,m_xrdOssDF->getFileDescriptor());
+  // need the file descriptor, so do it after we know the file is opened (and not just a stat for example)
+  //  IXrdCephBufferData * cephbuffer = new XrdCephBufferDataSimple(m_bufsize);
+  //  ICephIOAdapter * cephio =  new CephIOAdapterRaw(cephbuffer,m_xrdOssDF->getFileDescriptor()  );
+
+  std::unique_ptr<IXrdCephBufferData> cephbuffer = std::unique_ptr<IXrdCephBufferData>(new XrdCephBufferDataSimple(m_bufsize));
+  std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_xrdOssDF->getFileDescriptor()));
+
   std::stringstream msg; 
   msg << "XrdCephOssBufferedFile::Open: fd: " << m_xrdOssDF->getFileDescriptor() 
         <<  ". Buffer created: " << cephbuffer->capacity();
   XrdCephEroute.Say(msg.str().c_str());
+
+  // #TODO, use make_unique when c++14 is used
+  //m_bufferAlg = std::make_unique<XrdCephBufferAlgSimple>(cephbuffer,cephio,m_xrdOssDF->getFileDescriptor());
+  m_bufferAlg = std::unique_ptr<IXrdCephBufferAlg>(new XrdCephBufferAlgSimple(std::move(cephbuffer),std::move(cephio),m_xrdOssDF->getFileDescriptor()) );
+
+
 
 
   return rc;
@@ -97,12 +106,6 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
         return rc;
     }
   } // check for write
-  // TODO delete cephio, etc
-  
-  if (m_bufferAlg) { // #TODO mem leak if not relased ?
-    delete m_bufferAlg;
-    m_bufferAlg = nullptr;
-  }
   
 
   return m_xrdOssDF->Close(retsz);

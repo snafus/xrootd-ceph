@@ -6,6 +6,7 @@
 
 #include <sys/types.h> 
 #include <mutex>
+#include <memory>
 
 #include "IXrdCephBufferAlg.hh"
 #include "ICephIOAdapter.hh"
@@ -16,7 +17,7 @@ namespace XrdCephBuffer {
 
 class XrdCephBufferAlgSimple : public virtual  IXrdCephBufferAlg {
     public:
-        XrdCephBufferAlgSimple(IXrdCephBufferData * buffer, ICephIOAdapter * cephio, int fd ); 
+        XrdCephBufferAlgSimple(std::unique_ptr<IXrdCephBufferData> buffer, std::unique_ptr<ICephIOAdapter> cephio, int fd ); 
         virtual ~XrdCephBufferAlgSimple();
 
         virtual ssize_t read_aio (XrdSfsAio *aoip) override;
@@ -27,16 +28,16 @@ class XrdCephBufferAlgSimple : public virtual  IXrdCephBufferAlg {
         virtual ssize_t write(const void *buff, off_t offset, size_t blen) override;
         virtual ssize_t flushWriteCache() override; 
 
-        virtual const IXrdCephBufferData *buffer() const {return m_bufferdata;}
-        virtual IXrdCephBufferData *buffer() {return m_bufferdata;}
+        virtual const IXrdCephBufferData *buffer() const {return m_bufferdata.get();}
+        virtual IXrdCephBufferData *buffer() {return m_bufferdata.get();}
 
     protected:
         virtual ssize_t rawRead (void *buff,       off_t offset, size_t blen) ; // read from the storage, at its offset
         virtual ssize_t rawWrite(void *buff,       off_t offset, size_t blen) ; // write to the storage, to its offset posiiton
 
     private:
-        IXrdCephBufferData * m_bufferdata = nullptr; //! this algorithm takes ownership of the buffer, and will delete it on destruction
-        ICephIOAdapter * m_cephio = nullptr; // no ownership is taken here
+        std::unique_ptr<IXrdCephBufferData> m_bufferdata; //! this algorithm takes ownership of the buffer, and will delete it on destruction
+        std::unique_ptr<ICephIOAdapter>     m_cephio ; // no ownership is taken here
         int m_fd = -1;
 
         off_t m_bufferStartingOffset = 0;

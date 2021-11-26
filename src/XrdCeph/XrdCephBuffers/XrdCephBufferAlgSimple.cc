@@ -16,21 +16,21 @@
 using namespace XrdCephBuffer;
 
 
-XrdCephBufferAlgSimple::XrdCephBufferAlgSimple(IXrdCephBufferData * buffer, ICephIOAdapter * cephio, int fd ):
-m_bufferdata(buffer), m_cephio(cephio), m_fd(fd){
+XrdCephBufferAlgSimple::XrdCephBufferAlgSimple(std::unique_ptr<IXrdCephBufferData> buffer, std::unique_ptr<ICephIOAdapter> cephio, int fd ):
+m_bufferdata(std::move(buffer)), m_cephio(std::move(cephio)), m_fd(fd){
 
 }
 
 XrdCephBufferAlgSimple::~XrdCephBufferAlgSimple() {
         std::clog << "XrdCephBufferAlgSimple::Destructor fd:" << m_fd << std::endl;
-    if (m_bufferdata) {
-        delete m_bufferdata;
-        m_bufferdata = nullptr;
-    }
-    if (m_cephio) {
-        delete m_cephio;
-        m_cephio = nullptr;
-    }    
+    // if (m_bufferdata) {
+    //     delete m_bufferdata;
+    //     m_bufferdata = nullptr;
+    // }
+    // if (m_cephio) {
+    //     delete m_cephio;
+    //     m_cephio = nullptr;
+    // }    
     m_fd = -1;
 }
 
