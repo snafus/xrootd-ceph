@@ -42,6 +42,7 @@
 #include "XrdCeph/XrdCephOssDir.hh"
 #include "XrdCeph/XrdCephOssFile.hh"
 #include "XrdCeph/XrdCephOssBufferedFile.hh"
+#include "XrdCeph/XrdCephOssReadVFile.hh"
 
 XrdVERSIONINFO(XrdOssGetStorageSystem, XrdCephOss);
 
@@ -290,10 +291,28 @@ XrdOssDF* XrdCephOss::newFile(const char *tident) {
   //TODO create a config to setup the file type and buffer size, etc.
   //return new XrdCephOssFile(this);
   // base instance
-  XrdCephOssFile  * xrdCephOssDF =  new XrdCephOssFile(this);
+  //XrdCephOssFile  * xrdCephOssDF =  new XrdCephOssFile(this);
+  XrdCephOssFile* xrdCephOssDF =  new XrdCephOssFile(this);
+  //return xrdCephOssDF;
+
+  
   if (!m_configBufferEnable) return xrdCephOssDF;
   XrdCephEroute.Say("Ceph Buffermode enabled : size: ", std::to_string(m_configBufferSize).c_str() );
   // wrap with buffer layer and return
-  return new XrdCephOssBufferedFile(xrdCephOssDF, m_configBufferSize);
+  // XrdOssDF  * xrdCXrdCephOssFileephReadV = new XrdCephOssReadVFile(xrdCephOssDF);
+  //return xrdCephReadV;
+//return new XrdCephOssBufferedFile(xrdCephOssDF, m_configBufferSize);
+//return xrdCephReadV;
+  //  return new XrdCephOssBufferedFile(dynamic_cast<XrdCephOssFile*>(xrdCephOssDF), 
+  //                                     m_configBufferSize);
+
+  std::clog << "LogX: " << xrdCephOssDF << " " << dynamic_cast<XrdOssDF*>(xrdCephOssDF) <<  std::endl;
+
+  XrdOssDF  * bufFile = new XrdCephOssBufferedFile(xrdCephOssDF, m_configBufferSize);
+  std::clog << "Log: " << bufFile <<  " " << dynamic_cast<XrdCephOssFile*>(bufFile)  << " " 
+            << dynamic_cast<XrdOssDF*>(bufFile)<< std::endl;
+
+  return new XrdCephOssReadVFile(bufFile);
+
 }
 

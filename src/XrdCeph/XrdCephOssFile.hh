@@ -49,11 +49,11 @@
 //! In case one of the two only has a default, it will be applied for both plugins.
 //------------------------------------------------------------------------------
 
-class XrdCephOssFile : public XrdOssDF {
+class XrdCephOssFile : virtual public XrdOssDF {
 
 public:
 
-  XrdCephOssFile(XrdCephOss *cephoss);
+  explicit XrdCephOssFile(XrdCephOss *cephoss);
   virtual ~XrdCephOssFile() {};
   virtual int Open(const char *path, int flags, mode_t mode, XrdOucEnv &env);
   virtual int Close(long long *retsz=0);
@@ -67,7 +67,7 @@ public:
   virtual int Fsync(void);
   virtual int Ftruncate(unsigned long long);
 
-  inline int getFileDescriptor() const {return m_fd;}
+  inline virtual int getFileDescriptor() const {return m_fd;}
 private:
 
   int m_fd;

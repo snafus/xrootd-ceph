@@ -49,6 +49,9 @@ class XrdCephBufferDataSimple :  public virtual IXrdCephBufferData
         std::atomic< long> m_stats_read_req{0},   m_stats_write_req{0};
         long m_stats_read_longest{0}, m_stats_write_longest{0};
 
+        // staric vars to store the total useage of memory across this class
+        static std::atomic<long> m_total_memory_used;
+        static std::atomic<long> m_total_memory_nbuffers;
 
 }; // XrdCephBufferDataSimple
 

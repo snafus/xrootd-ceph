@@ -27,6 +27,7 @@
 
 #include "XrdOss/XrdOss.hh"
 #include "XrdCeph/XrdCephOss.hh"
+#include "XrdCeph/XrdCephOssFile.hh"
 
 #include "XrdCeph/XrdCephBuffers/IXrdCephBufferData.hh"
 #include "XrdCeph/XrdCephBuffers/IXrdCephBufferAlg.hh"
@@ -41,17 +42,18 @@
 //! small reads / writes from the client side
 //------------------------------------------------------------------------------
 
-class XrdCephOssBufferedFile : public XrdOssDF {
+class XrdCephOssBufferedFile : virtual public XrdCephOssFile { // XrdOssDF
 
 public:
-
   XrdCephOssBufferedFile(XrdCephOssFile *cephossDF, size_t buffersize); 
+  //explicit XrdCephOssBufferedFile(size_t buffersize); 
   virtual ~XrdCephOssBufferedFile();
   virtual int Open(const char *path, int flags, mode_t mode, XrdOucEnv &env);
   virtual int Close(long long *retsz=0);
   virtual ssize_t Read(off_t offset, size_t blen);
   virtual ssize_t Read(void *buff, off_t offset, size_t blen);
   virtual int     Read(XrdSfsAio *aoip);
+  virtual ssize_t ReadV(XrdOucIOVec *readV, int rdvcnt);
   virtual ssize_t ReadRaw(void *, off_t, size_t);
   virtual int Fstat(struct stat *buff);
   virtual ssize_t Write(const void *buff, off_t offset, size_t blen);

@@ -15,16 +15,29 @@
 
 using  namespace XrdCephBuffer;
 
+std::atomic<long> XrdCephBufferDataSimple::m_total_memory_used {0};
+std::atomic<long> XrdCephBufferDataSimple::m_total_memory_nbuffers {0};
+
+
 
 XrdCephBufferDataSimple::XrdCephBufferDataSimple(size_t bufCapacity):
  m_buffer(bufCapacity,0), m_externalOffset(0),m_bufLength(0) {
     m_valid = true;
+    m_total_memory_used.fetch_add(bufCapacity);
+    ++m_total_memory_nbuffers;
+    std::clog << "XrdCephBufferDataSimple:  Global: " << m_total_memory_nbuffers.load() << " " << m_total_memory_used.load() << std::endl;
 }
 
 XrdCephBufferDataSimple::~XrdCephBufferDataSimple() {
     m_valid = false;
+    auto cap = m_buffer.capacity();
     m_buffer.clear();
     m_buffer.reserve(0); // just to be paranoid and realse memory immediately
+
+    m_total_memory_used.fetch_add(-cap);
+    --m_total_memory_nbuffers;
+    std::clog << "XrdCephBufferDataSimple~:  Global: " << m_total_memory_nbuffers.load() << " " << m_total_memory_used.load() << std::endl;
+
 }
 
 

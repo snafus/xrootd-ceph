@@ -44,8 +44,12 @@ using namespace XrdCephBuffer;
 
 extern XrdSysError XrdCephEroute;
 
-XrdCephOssBufferedFile::XrdCephOssBufferedFile(XrdCephOssFile *cephossDF, size_t buffersize):
-m_xrdOssDF(cephossDF), m_bufsize(buffersize) {
+
+XrdCephOssBufferedFile::XrdCephOssBufferedFile(XrdCephOssFile *cephossDF, 
+                                                size_t buffersize):
+                  XrdCephOssFile(nullptr), m_xrdOssDF(cephossDF), m_bufsize(buffersize)
+{
+      if (!m_xrdOssDF) XrdCephEroute.Say("XrdCephOssBufferedFile::Null m_xrdOssDF");
 }
 
 XrdCephOssBufferedFile::~XrdCephOssBufferedFile() {
@@ -67,6 +71,11 @@ XrdCephOssBufferedFile::~XrdCephOssBufferedFile() {
 
 
 int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOucEnv &env) {
+  std::stringstream msg; 
+  msg << "XrdCephOssBufferedFile::Opening" ;
+    XrdCephEroute.Say(msg.str().c_str());
+  msg.clear();
+
   int rc = m_xrdOssDF->Open(path, flags, mode, env);
   if (rc < 0) {
     return rc;
@@ -75,13 +84,9 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
 
   // opened a file, so create the buffer here; note - this might be better delegated elswhere ...
   // need the file descriptor, so do it after we know the file is opened (and not just a stat for example)
-  //  IXrdCephBufferData * cephbuffer = new XrdCephBufferDataSimple(m_bufsize);
-  //  ICephIOAdapter * cephio =  new CephIOAdapterRaw(cephbuffer,m_xrdOssDF->getFileDescriptor()  );
-
   std::unique_ptr<IXrdCephBufferData> cephbuffer = std::unique_ptr<IXrdCephBufferData>(new XrdCephBufferDataSimple(m_bufsize));
   std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_xrdOssDF->getFileDescriptor()));
 
-  std::stringstream msg; 
   msg << "XrdCephOssBufferedFile::Open: fd: " << m_xrdOssDF->getFileDescriptor() 
         <<  ". Buffer created: " << cephbuffer->capacity();
   XrdCephEroute.Say(msg.str().c_str());
@@ -89,9 +94,6 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
   // #TODO, use make_unique when c++14 is used
   //m_bufferAlg = std::make_unique<XrdCephBufferAlgSimple>(cephbuffer,cephio,m_xrdOssDF->getFileDescriptor());
   m_bufferAlg = std::unique_ptr<IXrdCephBufferAlg>(new XrdCephBufferAlgSimple(std::move(cephbuffer),std::move(cephio),m_xrdOssDF->getFileDescriptor()) );
-
-
-
 
   return rc;
 }
@@ -111,8 +113,23 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
   return m_xrdOssDF->Close(retsz);
 }
 
+
+ssize_t XrdCephOssBufferedFile::ReadV(XrdOucIOVec *readV, int rnum) {
+  // direct copy of upstream version
+    int nbytes = 0, curCount = 0;
+
+    for (int i = 0; i < rnum; i++)
+    {
+      curCount = m_xrdOssDF->Read(readV[i].data, readV[i].offset, readV[i].size);
+      if (curCount != readV[i].size)
+        return (curCount < 0 ? curCount : -ESPIPE);
+      nbytes += curCount;
+    }
+    return nbytes;
+}
+
 ssize_t XrdCephOssBufferedFile::Read(off_t offset, size_t blen) {
-  return m_xrdOssDF->Read(offset,blen);
+  return m_xrdOssDF->Read(offset, blen);
 }
 
 ssize_t XrdCephOssBufferedFile::Read(void *buff, off_t offset, size_t blen) {
