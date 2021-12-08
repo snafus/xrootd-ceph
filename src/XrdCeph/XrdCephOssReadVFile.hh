@@ -47,7 +47,7 @@ class XrdCephOssReadVFile : virtual public XrdCephOssFile {
 
 public:
 
-  explicit XrdCephOssReadVFile(XrdCephOss *cephoss, XrdCephOssFile *cephossDF); 
+  explicit XrdCephOssReadVFile(XrdCephOss *cephoss, XrdCephOssFile *cephossDF,const std::string& algname); 
   virtual ~XrdCephOssReadVFile();
   virtual int Open(const char *path, int flags, mode_t mode, XrdOucEnv &env);
   virtual int Close(long long *retsz=0);
@@ -76,6 +76,15 @@ public:
 protected:
   XrdCephOss *m_cephoss  = nullptr;
   XrdCephOssFile * m_xrdOssDF = nullptr; // holder of the XrdCephOssFile instance
+  std::string m_algname = "passthrough";
+  std::unique_ptr<XrdCephBuffer::IXrdCephReadVAdapter> m_readVAdapter;
+
+  std::atomic<long> m_timer_read_ns {0}; //! timer for the reads against ceph
+  std::atomic<long> m_timer_count {0}; //! number of reads
+  std::atomic<long> m_timer_size {0}; //! number of reads
+  std::atomic<long> m_timer_longest {0}; //! size read in bytes
+
+
 };
 
 #endif /* __XRD_CEPH_OSS_READV_FILE_HH__ */

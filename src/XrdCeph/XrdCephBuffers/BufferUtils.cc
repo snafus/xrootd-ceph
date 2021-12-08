@@ -4,6 +4,11 @@
 
 using namespace XrdCephBuffer;
 
+#ifdef CEPHBUFDEBUG
+// to synchronise logging statements 
+  std::mutex cephbuf_iolock;
+#endif 
+
 // ------------------------------------------------------ //
 //         Extent       //
 
@@ -52,10 +57,17 @@ Extent Extent::containedExtent(const Extent &rhs) const
 
 bool Extent::operator<(const Extent &rhs) const
 {
-    return begin() < rhs.begin();
+    // comparison primarily on begin values
+    // use end values if begin values are equal.
+
+    if (begin() > rhs.begin()) return false;
+    if (begin() < rhs.begin()) return true;
+    if (end()   < rhs.end() )  return true;
+    return false; 
 }
 bool Extent::operator==(const Extent &rhs) const
 {
+    // equivalence based only on start and end
     if (begin() != rhs.begin())
         return false;
     if (end() != rhs.end())

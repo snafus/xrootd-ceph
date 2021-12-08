@@ -6,13 +6,20 @@
 
 #include <sys/types.h> 
 #include "IXrdCephBufferData.hh"
-
+#include "BufferUtils.hh"
 #include <vector>
 #include <atomic>
 #include <chrono>
 
 namespace XrdCephBuffer {
 
+/**
+ * @brief Implementation of a buffer using a simple vector<char>
+ * Simplest implementation of a buffer using vector<char> for underlying memory.
+ * Capacity is reserved on construction and released back at destruction.
+ * Does very little itself, except to provide access methods
+ * 
+ */
 class XrdCephBufferDataSimple :  public virtual IXrdCephBufferData
  {
     public:

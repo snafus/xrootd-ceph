@@ -12,6 +12,7 @@
 #include <sys/types.h> 
 #include "IXrdCephBufferData.hh"
 #include "ICephIOAdapter.hh"
+#include "BufferUtils.hh"
 
 #include <chrono>
 #include <memory>
@@ -19,17 +20,42 @@
 
 namespace XrdCephBuffer {
 
-
+/**
+ * @brief Implements a non-async read and write to ceph via ceph_posix calls
+ * Using the standard ceph_posix_ calls do the actual read and write operations.
+ * No ownership is taken on the buffer that's passed via the constructor
+ */
 class CephIOAdapterRaw: public  virtual ICephIOAdapter {
     public:
         CephIOAdapterRaw(IXrdCephBufferData * bufferdata, int fd);
         virtual ~CephIOAdapterRaw();
 
+        /**
+         * @brief Take the data in the buffer and write to ceph at given offset
+         * Issues a ceph_posix_pwrite for data in the buffer (from pos 0) into 
+         * ceph at position offset with len count.
+         * Returns -ve on error, else the number of bytes writen.
+         * 
+         * @param offset 
+         * @param count 
+         * @return ssize_t 
+         */
         virtual ssize_t write(off64_t offset,size_t count) override;
+
+        /**
+         * @brief Issue a ceph_posix_pread to read to the buffer data from file offset and len count.
+         * No range checking is currently provided here. The caller must provide sufficient space for the 
+         * max len read.
+         * Returns -ve errorcode on failure, else the number of bytes returned. 
+         * 
+         * @param offset 
+         * @param count 
+         * @return ssize_t 
+         */
         virtual ssize_t read(off64_t offset,size_t count) override;
 
     private:
-        IXrdCephBufferData * m_bufferdata; // no ownership of pointer (consider shared ptrs, etc)
+        IXrdCephBufferData * m_bufferdata; //!< no ownership of pointer (consider shared ptrs, etc)
         int m_fd;
 
         // timer and counter info

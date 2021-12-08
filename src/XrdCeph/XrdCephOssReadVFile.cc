@@ -38,21 +38,32 @@
 #include "XrdCeph/XrdCephOssFile.hh"
 
 #include "XrdCeph/XrdCephOssReadVFile.hh"
-#include "XrdCeph/XrdCephBuffers/BufferUtils.hh"
+#include "XrdCeph/XrdCephBuffers/XrdCephReadVBasic.hh"
+#include "XrdCeph/XrdCephBuffers/XrdCephReadVNoOp.hh"
 
 using namespace XrdCephBuffer;
 
 extern XrdSysError XrdCephEroute;
+extern XrdOucTrace XrdCephTrace;
 
-XrdCephOssReadVFile::XrdCephOssReadVFile(XrdCephOss *cephoss,XrdCephOssFile *cephossDF):
-XrdCephOssFile(cephoss), m_cephoss(cephoss), m_xrdOssDF(cephossDF)
+XrdCephOssReadVFile::XrdCephOssReadVFile(XrdCephOss *cephoss,XrdCephOssFile *cephossDF,const std::string& algname):
+XrdCephOssFile(cephoss), m_cephoss(cephoss), m_xrdOssDF(cephossDF),m_algname(algname)
 {
-    if (!m_xrdOssDF) XrdCephEroute.Say("XrdCephOssReadVFile::Null m_xrdOssDF");
+  if (!m_xrdOssDF) XrdCephEroute.Say("XrdCephOssReadVFile::Null m_xrdOssDF");
+
+  if (m_algname == "passthrough") { // #TODO consider to use a factory method. but this is simple enough for now
+      m_readVAdapter =  std::unique_ptr<XrdCephBuffer::IXrdCephReadVAdapter>(new XrdCephBuffer::XrdCephReadVNoOp());
+  } else if (m_algname == "basic") { 
+      m_readVAdapter =  std::unique_ptr<XrdCephBuffer::IXrdCephReadVAdapter>(new XrdCephBuffer::XrdCephReadVBasic());
+  } else {
+    XrdCephEroute.Say("XrdCephOssReadVFile::ERROR Invalid ReadV algorthm passed; defaulting to passthrough");
+    m_algname = "passthrough";
+    m_readVAdapter =  std::unique_ptr<XrdCephBuffer::IXrdCephReadVAdapter>(new XrdCephBuffer::XrdCephReadVNoOp());
+  }
+  LOGCEPH("XrdCephOssReadVFile Algorithm type: " << m_algname);
 }
 
 XrdCephOssReadVFile::~XrdCephOssReadVFile() {
-    XrdCephEroute.Say("XrdCephOssReadVFile::Destructor");
-
   if (m_xrdOssDF) {
     delete m_xrdOssDF;
     m_xrdOssDF = nullptr;
@@ -61,98 +72,106 @@ XrdCephOssReadVFile::~XrdCephOssReadVFile() {
 }
 
 int XrdCephOssReadVFile::Open(const char *path, int flags, mode_t mode, XrdOucEnv &env) {
-  std::stringstream msg; 
-  msg << "XrdCephOssReadVFile::Opening" ; 
-  XrdCephEroute.Say(msg.str().c_str());
-  msg.flush();
-
   int rc = m_xrdOssDF->Open(path, flags, mode, env);
   if (rc < 0) {
     return rc;
   }
   m_fd = m_xrdOssDF->getFileDescriptor();
-  std::stringstream msg2; 
-  msg2 << "XrdCephOssReadVFile::Open: fd: " << m_xrdOssDF->getFileDescriptor(); 
-  XrdCephEroute.Say(msg2.str().c_str());
-
+  LOGCEPH("XrdCephOssReadVFile::Open: fd: " << m_fd << " " << path );
   return rc;
 }
 
 int XrdCephOssReadVFile::Close(long long *retsz) {
+  LOGCEPH("XrdCephOssReadVFile::Close: retsz: " << retsz << " Time_ceph_s: " << m_timer_read_ns.load()*1e-9 << " count: " 
+      <<  m_timer_count.load()  << " size_B: " << m_timer_size.load()
+      << " longest_s:" <<  m_timer_longest.load()*1e-9);
+
   return m_xrdOssDF->Close(retsz);
 }
 
 
 ssize_t XrdCephOssReadVFile::ReadV(XrdOucIOVec *readV, int rnum) {
   int fd = m_xrdOssDF->getFileDescriptor();
-  std::stringstream msg; 
-  msg << "XrdCephOssReadVFile::ReadV: fd: " << fd  << " " << rnum << "\n";
-  XrdCephEroute.Say(msg.str().c_str()); msg.clear();
+  LOGCEPH("XrdCephOssReadVFile::ReadV: fd: " << fd  << " " << rnum << "\n" );
+
+  std::stringstream msg_extents; 
+  msg_extents << "EXTENTS=[";
 
   ExtentHolder extents(rnum);
   for (int i = 0; i < rnum; i++) {
     extents.push_back(Extent(readV[i].offset, readV[i].size));
+    msg_extents << "(" << readV[i].offset << "," << readV[i].size << ")," ;
   }
-  msg.clear(); 
-  msg << "Extents: fd: "<< fd << " "  << extents.size() << " " << extents.len() << " " 
+  msg_extents << "]";
+  //XrdCephEroute.Say(msg_extents.str().c_str()); msg_extents.clear();
+  LOGCEPH(msg_extents.str());
+
+  LOGCEPH("Extents: fd: "<< fd << " "  << extents.size() << " " << extents.len() << " " 
       << extents.begin() << " " << extents.end() << " " << extents.bytesContained() 
-      << " " << extents.bytesMissing();
-  XrdCephEroute.Say(msg.str().c_str());
+      << " " << extents.bytesMissing());
 
-  //std::unique_ptr<XrdCephBuffer::IXrdCephReadVAdapter> readVAdapter(new XrdCephBuffer::XrdCephReadVNoOp());
-  std::unique_ptr<XrdCephBuffer::IXrdCephReadVAdapter> readVAdapter(new XrdCephBuffer::XrdCephReadVBasic());
+  // take the input set of extents and return a vector of merged extents (covering the range to read)
+  std::vector<ExtentHolder> mappedExtents = m_readVAdapter->convert(extents);
 
-  std::vector<ExtentHolder> mappedExtents = readVAdapter->convert(extents);
 
+  // counter is the iterator to the original readV elements, and is incremented for each chunk that's returned
+  int nbytes = 0, curCount = 0, counter(0);
   size_t totalBytesRead(0), totalBytesUseful(0);
 
-  int nbytes = 0, curCount = 0, counter(0);
+  // extract the largest range of the extents, and create a buffer.
+  size_t buffersize{0};
+  for (std::vector<ExtentHolder>::const_iterator ehit = mappedExtents.cbegin(); ehit!= mappedExtents.cend(); ++ehit ) {
+    buffersize = std::max(buffersize, ehit->len());
+  }
+  std::vector<char> buffer;
+  buffer.reserve(buffersize);
 
-  std:: clog << "mappedExtents: " << mappedExtents.size() << std::endl;
+
+  LOGCEPH("mappedExtents: len: " << mappedExtents.size() );
   for (std::vector<ExtentHolder>::const_iterator ehit = mappedExtents.cbegin(); ehit!= mappedExtents.cend(); ++ehit ) {
     off_t off = ehit->begin();
     size_t len = ehit->len();
 
-    std:: clog << "outerloop: " << off << " " << len << " " << ehit->end() << " " << " " << ehit->size() << std::endl;
+    LOGCEPH("outerloop: " << off << " " << len << " " << ehit->end() << " " << " " << ehit->size() );
 
     // read the full extent into the buffer
-    // #fixme
-    std::vector<char> buffer;
-    buffer.reserve(len);
+    long timed_read_ns{0};
+    {Timer_ns ts(timed_read_ns); 
     curCount = m_xrdOssDF->Read(buffer.data(), off, len);
-    std:: clog << "buf Read " << curCount << std::endl;
+    } // timer scope 
+  ++m_timer_count;
+  auto l = m_timer_longest.load(); 
+  m_timer_longest.store(max(l,timed_read_ns)); // doesn't quite prevent race conditions
+  m_timer_read_ns.fetch_add(timed_read_ns);
+  m_timer_size.fetch_add(curCount);
+
+    // check that the correct amount of data was read. 
+    // std:: clog << "buf Read " << curCount << std::endl;
     if (curCount != (ssize_t)len) {
       return (curCount < 0 ? curCount : -ESPIPE);
     }
     totalBytesRead += curCount;
     totalBytesUseful += ehit->bytesContained(); 
 
-    // now read out into the original readV requests
+
+    // now read out into the original readV requests for each of the held inner extents
     const char* data = buffer.data();
     const ExtentContainer& innerExtents = ehit->extents();
     for (ExtentContainer::const_iterator it = innerExtents.cbegin(); it != innerExtents.cend(); ++it) {
       off_t innerBegin = it->begin() - off;
       off_t innerEnd   = it->end()   - off; 
-      std:: clog << "innerloop: " << innerBegin << " " << innerEnd << " " << off << " " << it->begin() << " " << it-> end() << " " << readV[counter].offset << " " << readV[counter].size <<  std::endl;
-      std::copy(data+innerBegin, data+innerEnd, readV[counter].data);
+      LOGCEPH( "innerloop: " << innerBegin << " " << innerEnd << " " << off << " " 
+                << it->begin() << " " << it-> end() << " " 
+                << readV[counter].offset << " " << readV[counter].size);
+      std::copy(data+innerBegin, data+innerEnd, readV[counter].data );
       nbytes += it->len();
       ++counter; // next element
     } // inner extents
 
   } // outer extents
-  std::clog << "readV returning " << nbytes << " bytes: " << "Read:  " <<totalBytesRead << " Useful: " << totalBytesUseful  << endl;
+  LOGCEPH( "readV returning " << nbytes << " bytes: " << "Read:  " <<totalBytesRead << " Useful: " << totalBytesUseful );
   return nbytes;
 
-    // int nbytes = 0, curCount = 0;
-
-    // for (int i = 0; i < rnum; i++)
-    // {
-    //   curCount = m_xrdOssDF->Read(readV[i].data, readV[i].offset, readV[i].size);
-    //   if (curCount != readV[i].size)
-    //     return (curCount < 0 ? curCount : -ESPIPE);
-    //   nbytes += curCount;
-    // }
-    // return nbytes;
 }
 
 ssize_t XrdCephOssReadVFile::Read(off_t offset, size_t blen) {

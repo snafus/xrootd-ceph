@@ -10,6 +10,11 @@
 
 namespace XrdCephBuffer {
 
+/**
+ * @brief Interface to the Buffer's  physical representation.
+ * Allow an interface to encapsulate the requirements of a buffer's memory, without worrying about the details.
+ * Various options exist for the specific buffer implemented, and are left to the sub-classes.
+ */
 class IXrdCephBufferData {
     public:
         virtual ~IXrdCephBufferData(){}

@@ -68,7 +68,7 @@ public:
   virtual int Ftruncate(unsigned long long);
 
   inline virtual int getFileDescriptor() const {return m_fd;}
-private:
+protected:
 
   int m_fd;
   XrdCephOss *m_cephOss;

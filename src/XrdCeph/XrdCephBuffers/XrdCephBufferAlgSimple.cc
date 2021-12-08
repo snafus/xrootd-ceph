@@ -22,21 +22,15 @@ m_bufferdata(std::move(buffer)), m_cephio(std::move(cephio)), m_fd(fd){
 }
 
 XrdCephBufferAlgSimple::~XrdCephBufferAlgSimple() {
-        std::clog << "XrdCephBufferAlgSimple::Destructor fd:" << m_fd << std::endl;
-    // if (m_bufferdata) {
-    //     delete m_bufferdata;
-    //     m_bufferdata = nullptr;
-    // }
-    // if (m_cephio) {
-    //     delete m_cephio;
-    //     m_cephio = nullptr;
-    // }    
+    BUFLOG("XrdCephBufferAlgSimple::Destructor fd:" << m_fd);
     m_fd = -1;
 }
 
 
 ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
+    // Currently this is not supported, and callers using this should recieve the appropriate error code
     return -ENOSYS;
+    /*
     ssize_t rc(-ENOSYS);
     if (!aoip) {
         return -EINVAL; 
@@ -54,10 +48,13 @@ ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
     aoip->doneRead();
 
     return rc;
+    */
 }
 
 ssize_t XrdCephBufferAlgSimple::write_aio(XrdSfsAio *aoip) {
+    // Currently this is not supported, and callers using this should recieve the appropriate error code
     return -ENOSYS;
+    /*
     ssize_t rc(-ENOSYS);
         if (!aoip) {
              return -EINVAL; 
@@ -73,30 +70,44 @@ ssize_t XrdCephBufferAlgSimple::write_aio(XrdSfsAio *aoip) {
     aoip->Result = rc;
     aoip->doneWrite();
     return rc;
+    */
 }
 
 
 ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t blen)  {
+    // Set a lock for any attempt at a simultaneous operation
+    // Use recursive, as flushCache also calls the lock and don't want to deadlock
+    // No call to flushCache should happen in a read, but be consistent
     const std::lock_guard<std::recursive_mutex> lock(m_data_mutex); // 
 
-    std::clog << "XrdCephBufferAlgSimple::read: " << offset << " " << blen << std::endl;
+    BUFLOG("XrdCephBufferAlgSimple::read: " << offset << " " << blen);
     if (blen == 0) return 0;
 
+    /**
+     * If the requested read is larger than the buffer size, just bypass the cache.
+     * Invalidate the cache in anycase
+     */
     if (blen >= m_bufferdata->capacity()) {
-        std::clog << "XrdCephBufferAlgSimple::read: Readthrough cache: fd: " << m_fd 
-                  << " " << offset << " " << blen << std::endl;
+        BUFLOG("XrdCephBufferAlgSimple::read: Readthrough cache: fd: " << m_fd 
+                  << " " << offset << " " << blen);
         // larger than cache, so read through, and invalidate the cache anyway
         m_bufferdata->invalidate();
-        // #FIXME JW: const_cast is probably a bit dangerous here!
+        // #FIXME JW: const_cast is probably a bit poor.
         return ceph_posix_pread(m_fd, const_cast<void*>(buf), blen, offset);
     }
 
     ssize_t rc(-1);
-    size_t bytesRemaining = blen;
+    size_t bytesRemaining = blen; // track how many bytes still need to be read
     off_t offsetDelta = 0;
     size_t bytesRead = 0;
-    while (bytesRemaining > 0) { // in principle, only should ever have the first loop
+    /**
+     * In principle, only should ever have the first loop, however, in the case a read request
+     * passes over the boundary of the buffer, two reads will be needed; the first to read 
+     * out the current buffer, and a second, to read the partial data from the refilled buffer
+     */
+    while (bytesRemaining > 0) { 
         bool loadCache = false;
+        // run some checks to see if we need to fill the cache. 
         if (m_bufferLength == 0) {
             // no data in buffer
             loadCache = true;
@@ -108,19 +119,23 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
             loadCache = true;
         }
 
-        // do we need to read data into the cache?
+        /**
+         * @brief If we need to load data in the cache, do it here.
+         * 
+         */
         if (loadCache) {
             m_bufferdata->invalidate();
             rc = m_cephio->read(offset + offsetDelta, m_bufferdata->capacity()); // fill the cache
-            std::clog << "LoadCache ReadToCache: " << rc << " " << offset + offsetDelta << " " << m_bufferdata->capacity() << std::endl;
+            BUFLOG("LoadCache ReadToCache: " << rc << " " << offset + offsetDelta << " " << m_bufferdata->capacity() );
             if (rc < 0) {
-                std::clog << "LoadCache Error: " << rc << std::endl;
+                BUFLOG("LoadCache Error: " << rc);
                 return rc;// TODO return correct errors
             }
             m_bufferStartingOffset = offset + offsetDelta;
             m_bufferLength = rc;
             if (rc == 0) {
-                // perhaps at end of file and nothing to read?
+                // We should be at the end of file, with nothing more to read, and nothing that could be returned
+                // break out of the loop.
                 break;
             }
         }
@@ -129,17 +144,17 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
         off_t bufPosition = offset - m_bufferStartingOffset + offsetDelta; 
         rc =  m_bufferdata->readBuffer( (void*) &(((char*)buf)[offsetDelta]) , bufPosition  + offsetDelta , bytesRemaining);
         if (rc < 0 ) {
-            std::clog << "Reading from Cache Failed: " << rc << "  " << offsetDelta << "  " << bytesRemaining << std::endl;
+            BUFLOG("Reading from Cache Failed: " << rc << "  " << offsetDelta << "  " << bytesRemaining );
             return rc; // TODO return correct errors
         }
         if (rc == 0) {
             // no bytes returned; much be at end of file
-            std::clog << "No bytes returned: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining << std::endl;
+            BUFLOG("No bytes returned: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining);
             break; // leave the loop even though bytesremaing is probably >=0.
             //i.e. requested a full buffers worth, but only a fraction of the file is here.
         }
 
-        std::clog << "End of loop: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining << std::endl;
+        BUFLOG("End of loop: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining);
         offsetDelta    += rc; 
         bytesRemaining -= rc;
         bytesRead      += rc;
@@ -150,7 +165,9 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
 }
 
 ssize_t XrdCephBufferAlgSimple::write (const void *buf, off_t offset, size_t blen) {
-    const std::lock_guard<std::recursive_mutex> lock(m_data_mutex); // 
+    // Set a lock for any attempt at a simultaneous operation
+    // Use recursive, as flushCache also calls the lock and don't want to deadlock
+    const std::lock_guard<std::recursive_mutex> lock(m_data_mutex); 
 
     // take the data in buf and put it into the cache; when the cache is full, write to underlying storage
     // remember to flush the cache at the end of operations ... 
@@ -161,20 +178,34 @@ ssize_t XrdCephBufferAlgSimple::write (const void *buf, off_t offset, size_t ble
         return 0; // nothing to write; are we done?
     }
 
+    /** 
+     * We expect the next write to be in order and well defined. 
+     * Determine the expected offset, and compare against offset provided
+     * Expected offset is the end of the buffer. 
+     * m_bufferStartingOffset is the represented offset in ceph that buffer[0] represents
+    */
     off_t expected_offset = (off_t)(m_bufferStartingOffset + m_bufferLength);
 
     if ((offset != expected_offset) && (m_bufferLength > 0) ) {
+        // for the moment we just log that there is some non expected offset value 
         // TODO, might be dangerous to flush the cache on non-aligned writes ... 
-        std::clog << "Non expected offset: " << rc << "  " << offset << "  " << expected_offset << std::endl;
+        BUFLOG("Non expected offset: " << rc << "  " << offset << "  " << expected_offset);
         // rc = flushWriteCache();
         // if (rc < 0) {
         //     return rc; // TODO return correct errors
         // }
     } // mismatched offset
 
+    //! We should be equally careful if the offset of the buffer start is not aligned sensibly.
+    //! Log this only for now, but #TODO, this should be come an error condition for over cautitious behaviour.
     if ( (m_bufferStartingOffset % m_bufferdata->capacity()) != 0 ) {
-        std::clog << " Non aligned offset?" << m_bufferStartingOffset << " " <<  m_bufferdata->capacity() << " " <<  m_bufferStartingOffset % m_bufferdata->capacity() << std::endl;
+        BUFLOG(" Non aligned offset?" << m_bufferStartingOffset << " "
+        <<  m_bufferdata->capacity() << " " <<  m_bufferStartingOffset % m_bufferdata->capacity() );
     }
+
+    // Commmented out below. It would be good to pass writes, which are larger than the buffer size,
+    // straight-through. However if the ranges are not well aligned, this could be an issue.
+    // And, what then to do about a possible partial filled buffer?
 
     // if (blen >= m_bufferdata->capacity()) {
     //     // TODO, might be dangerous to flush the cache on non-aligned writes ... 
@@ -200,66 +231,108 @@ ssize_t XrdCephBufferAlgSimple::write (const void *buf, off_t offset, size_t ble
     //     return rc;
     // }
 
-    // if needed, we flushed the cache, but maybe the cache is already partly full    
-    size_t bytesRemaining = blen;
-    off_t  offsetDelta = 0;
+    /**
+     * @brief Provide some sanity checking for the write to the buffer.
+     * We call an error on this conditions as there is no immediate solution that is satisfactory.
+     */
+    if ((offset != expected_offset) && (m_bufferLength > 0) ) {
+        BUFLOG("Error trying to write out of order: expeted at: " << expected_offset 
+        << " got offset" << offset << " of len " << blen);
+        return -EINVAL; 
+    }
+    if (offset < 0) {
+        BUFLOG("Got a negative offset: " << offset);
+        return -EINVAL; 
+    }
+
+
+    size_t bytesRemaining = blen; //!< track how many bytes left to write
     size_t bytesWritten = 0;
-    off_t  bufferOffset = m_bufferLength; // position to append data in the buffer
+    off_t  bufferOffset = m_bufferLength; // position to append data in the buffer, i.e. the end of the buffer
 
-    while (bytesRemaining > 0) { // expect that only one loop is perfomed, else likely to have written directly
-        if (m_bufferLength == 0) {
-            // empty cache, so set the external offset now
-            m_bufferStartingOffset = offset + offsetDelta;
-        }
-        //add data to the cache
-        rc = m_bufferdata->writeBuffer(buf, bufferOffset, bytesRemaining, 0);
-        if (rc < 0) {
-            std::clog << "WriteBuffer step failed: " << rc << "  " << bufferOffset << "  " << blen << "  " << offset << std::endl;
-            return rc; // TODO return correct errors
-        }
-
-        m_bufferLength += rc;
-        bufferOffset   += rc;
-        bytesWritten   += rc;
-        offsetDelta    += rc;
-        bytesRemaining -= rc;
-
+    /** Typically would expect only one loop, i.e. the write request is smaller than the buffer.
+     * If bigger, or the request stradles the end of the buffer, will need another loop
+     */
+    while (bytesRemaining > 0) { 
+        /** 
+         * If the cache is already full, lets flush to disk now
+        */
         if (m_bufferLength == m_bufferdata->capacity()) {
             rc = flushWriteCache();
             if (rc < 0) {
-               return rc; // TODO return correct errors
+               return rc; 
             }
             bytesWrittenToStorage += rc;
         } // at capacity; 
-        
+
+        if (m_bufferLength == 0) {
+            // cache is currently empty, so set the 'reference' to the external offset now
+            m_bufferStartingOffset = offset + bytesWritten;
+        }
+        //add data to the cache from buf, from buf[offsetDelta] to the cache at position bufferOffset
+        // make sure to write only as many bytes as left in the cache.
+        size_t nBytesToWrite = std::min(bytesRemaining, m_bufferdata->capacity()-m_bufferLength);
+        const void* bufAtOffset = (void*)((char*)buf +  bytesWritten); // nasty cast as void* doesn't do arithmetic
+        if (nBytesToWrite == 0) {
+            BUFLOG( "Wanting to write 0 bytes; why is that?");
+        }
+        rc = m_bufferdata->writeBuffer(bufAtOffset, bufferOffset, nBytesToWrite, 0); 
+        if (rc < 0) {
+            BUFLOG( "WriteBuffer step failed: " << rc << "  " << bufferOffset << "  " << blen << "  " << offset );
+            return rc; // pass the error condidition upwards
+        }
+        if (rc != (ssize_t)nBytesToWrite) {
+            BUFLOG( "WriteBuffer returned unexpected number of bytes: " << rc << "  Expected: " << nBytesToWrite << " " 
+             << bufferOffset << "  " << blen << "  " << offset );
+            return -EBADE; // is bad exchange error best errno here?
+        }
+
+        // lots of repetition here; #TODO try to reduce 
+        m_bufferLength += rc;
+        bufferOffset   += rc;
+        bytesWritten   += rc;
+        bytesRemaining -= rc;
+
     } // while byteRemaining
-    std::clog << "WriteBuffer " << bytesWritten << " " << bytesWrittenToStorage << "  " << offset << "  " << blen << " " << std::endl;
 
+    /**
+     * @brief Check again if we can write data into the storage
+     */
+    if (m_bufferLength == m_bufferdata->capacity()){
+        rc = flushWriteCache();
+        if (rc < 0)
+        {
+            return rc; // TODO return correct errors
+        }
+        bytesWrittenToStorage += rc;
+    } // at capacity;
 
+    BUFLOG( "WriteBuffer " << bytesWritten << " " << bytesWrittenToStorage << "  " << offset << "  " << blen << " " );
     return bytesWritten;
 }
 
 
 
 ssize_t XrdCephBufferAlgSimple::flushWriteCache()  {
+    // Set a lock for any attempt at a simultaneous operation
+    // Use recursive, as write (and read) also calls the lock and don't want to deadlock
     const std::lock_guard<std::recursive_mutex> lock(m_data_mutex); // 
-    std::clog << "flushWriteCache: " << m_bufferStartingOffset << " " << m_bufferLength << std::endl; 
+    BUFLOG("flushWriteCache: " << m_bufferStartingOffset << " " << m_bufferLength);
     ssize_t rc(-1);
-    if (m_bufferLength == 0 ) {
-        return 0; // nothing to be written
-    }
-    // #TODO; the actual write
-    rc = m_cephio->write(m_bufferStartingOffset, m_bufferLength);
-    if (rc < 0) {
-        std::clog << "WriteBuffer write step failed: " << rc << std::endl;
-        return rc;  // TODO return correct errors
-    }
+    if (m_bufferLength > 0) {
+        rc = m_cephio->write(m_bufferStartingOffset, m_bufferLength);
+        if (rc < 0) {
+            BUFLOG("WriteBuffer write step failed: " << rc);
+        }
+    } // some bytes to write
+
+    // reset values
     m_bufferLength=0;
     m_bufferStartingOffset=0;
     m_bufferdata->invalidate();
+    // return bytes written, or errorcode if failure
     return rc;
 }
-
 
 
 ssize_t XrdCephBufferAlgSimple::rawRead (void *buf,       off_t offset, size_t blen) {

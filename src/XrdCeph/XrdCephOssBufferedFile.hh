@@ -45,7 +45,7 @@
 class XrdCephOssBufferedFile : virtual public XrdCephOssFile { // XrdOssDF
 
 public:
-  XrdCephOssBufferedFile(XrdCephOssFile *cephossDF, size_t buffersize); 
+  XrdCephOssBufferedFile(XrdCephOss *cephoss,XrdCephOssFile *cephossDF, size_t buffersize); 
   //explicit XrdCephOssBufferedFile(size_t buffersize); 
   virtual ~XrdCephOssBufferedFile();
   virtual int Open(const char *path, int flags, mode_t mode, XrdOucEnv &env);
@@ -62,6 +62,7 @@ public:
   virtual int Ftruncate(unsigned long long);
 
 protected:
+  XrdCephOss *m_cephoss  = nullptr;
   XrdCephOssFile * m_xrdOssDF = nullptr; // holder of the XrdCephOssFile instance
   std::unique_ptr<XrdCephBuffer::IXrdCephBufferAlg>(m_bufferAlg);
 

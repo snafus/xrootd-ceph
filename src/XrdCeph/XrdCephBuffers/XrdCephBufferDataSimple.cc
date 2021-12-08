@@ -15,17 +15,19 @@
 
 using  namespace XrdCephBuffer;
 
-std::atomic<long> XrdCephBufferDataSimple::m_total_memory_used {0};
-std::atomic<long> XrdCephBufferDataSimple::m_total_memory_nbuffers {0};
+std::atomic<long> XrdCephBufferDataSimple::m_total_memory_used {0}; //!< total memory of all these buffers
+std::atomic<long> XrdCephBufferDataSimple::m_total_memory_nbuffers {0}; //!< total number of buffers actively open
 
 
 
 XrdCephBufferDataSimple::XrdCephBufferDataSimple(size_t bufCapacity):
  m_buffer(bufCapacity,0), m_externalOffset(0),m_bufLength(0) {
     m_valid = true;
+
+    // update global statistics
     m_total_memory_used.fetch_add(bufCapacity);
     ++m_total_memory_nbuffers;
-    std::clog << "XrdCephBufferDataSimple:  Global: " << m_total_memory_nbuffers.load() << " " << m_total_memory_used.load() << std::endl;
+    BUFLOG("XrdCephBufferDataSimple:  Global: " << m_total_memory_nbuffers.load() << " " << m_total_memory_used.load());
 }
 
 XrdCephBufferDataSimple::~XrdCephBufferDataSimple() {
@@ -34,9 +36,10 @@ XrdCephBufferDataSimple::~XrdCephBufferDataSimple() {
     m_buffer.clear();
     m_buffer.reserve(0); // just to be paranoid and realse memory immediately
 
+    // update global statistics
     m_total_memory_used.fetch_add(-cap);
     --m_total_memory_nbuffers;
-    std::clog << "XrdCephBufferDataSimple~:  Global: " << m_total_memory_nbuffers.load() << " " << m_total_memory_used.load() << std::endl;
+    BUFLOG("XrdCephBufferDataSimple~:  Global: " << m_total_memory_nbuffers.load() << " " << m_total_memory_used.load());
 
 }
 
@@ -110,7 +113,7 @@ ssize_t XrdCephBufferDataSimple::readBuffer(void* buf, off_t offset, size_t blen
         // std::copy(rawbufstart + offset, rawbufstart+offset+readlength, reinterpret_cast<char*>(buf) );
         memcpy(reinterpret_cast<char*>(buf), rawbufstart + offset, readlength);
     } // end Timer
-    std::clog << "XrdCephBufferDataSimple::readBuffer: " << offset << " " << readlength << " " << int_ns<< std::endl;
+    BUFLOG("XrdCephBufferDataSimple::readBuffer: " << offset << " " << readlength << " " << int_ns );
 
     return readlength;
 }
@@ -143,13 +146,13 @@ ssize_t XrdCephBufferDataSimple::writeBuffer(const void* buf, off_t offset, size
 
 
     long int_ns{0};
-    {auto t = Timer_ns(int_ns);
+    {auto t = Timer_ns(int_ns); // brace for timer start/stop scoping
       //std::copy((char*)buf, (char*)buf +readBytes ,itstart + offset );
       memcpy(rawbufstart + offset, buf, readBytes);
 
     } // end Timer
 
-    std::clog << "XrdCephBufferDataSimple::writeBuffer: " << offset << " " << readBytes << " " << int_ns << std::endl;
+    BUFLOG("XrdCephBufferDataSimple::writeBuffer: " << offset << " " << readBytes << " " << int_ns);
 
 
 

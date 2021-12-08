@@ -10,10 +10,19 @@
 
 #include "IXrdCephBufferAlg.hh"
 #include "ICephIOAdapter.hh"
-
+#include "BufferUtils.hh"
 
 
 namespace XrdCephBuffer {
+
+/** Non-async buffering code for non-aio read operations.
+ * Create a single buffer of a given size.
+ * For reads, if data in the buffer read and return the available bytes;
+ *   if no useful data in the buffer fill the full buffer and return the requested read.
+ * If the data is partially in the buffer for the range requested, return only that subset; 
+ * client should check and make an additional call for the data not returned.
+ * if 0 bytes are returned, it should be assumed it is at the end of the file.
+ */
 
 class XrdCephBufferAlgSimple : public virtual  IXrdCephBufferAlg {
     public:

@@ -43,25 +43,20 @@
 using namespace XrdCephBuffer;
 
 extern XrdSysError XrdCephEroute;
+extern XrdOucTrace XrdCephTrace;
 
 
-XrdCephOssBufferedFile::XrdCephOssBufferedFile(XrdCephOssFile *cephossDF, 
+XrdCephOssBufferedFile::XrdCephOssBufferedFile(XrdCephOss *cephoss,XrdCephOssFile *cephossDF, 
                                                 size_t buffersize):
-                  XrdCephOssFile(nullptr), m_xrdOssDF(cephossDF), m_bufsize(buffersize)
+                  XrdCephOssFile(cephoss), m_cephoss(cephoss), m_xrdOssDF(cephossDF), m_bufsize(buffersize)
 {
-      if (!m_xrdOssDF) XrdCephEroute.Say("XrdCephOssBufferedFile::Null m_xrdOssDF");
+
 }
 
 XrdCephOssBufferedFile::~XrdCephOssBufferedFile() {
-    XrdCephEroute.Say("XrdCephOssBufferedFile::Destructor");
+    // XrdCephEroute.Say("XrdCephOssBufferedFile::Destructor");
 
-  // call the destructor of wrapped and delegated classes:
-  // Using std::unique should make this redundant
-  // if (m_bufferAlg) {
-  //   delete m_bufferAlg;
-  //   m_bufferAlg = nullptr;
-  // }
-
+  // remember to delete the inner XrdCephOssFile object
   if (m_xrdOssDF) {
     delete m_xrdOssDF;
     m_xrdOssDF = nullptr;
@@ -71,61 +66,46 @@ XrdCephOssBufferedFile::~XrdCephOssBufferedFile() {
 
 
 int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOucEnv &env) {
-  std::stringstream msg; 
-  msg << "XrdCephOssBufferedFile::Opening" ;
-    XrdCephEroute.Say(msg.str().c_str());
-  msg.clear();
 
   int rc = m_xrdOssDF->Open(path, flags, mode, env);
   if (rc < 0) {
     return rc;
   }
+  m_fd = m_xrdOssDF->getFileDescriptor();
   m_flags = flags; // e.g. for write/read knowledge
 
-  // opened a file, so create the buffer here; note - this might be better delegated elswhere ...
+  // opened a file, so create the buffer here; note - this might be better delegated to the first read/write ...
   // need the file descriptor, so do it after we know the file is opened (and not just a stat for example)
   std::unique_ptr<IXrdCephBufferData> cephbuffer = std::unique_ptr<IXrdCephBufferData>(new XrdCephBufferDataSimple(m_bufsize));
-  std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_xrdOssDF->getFileDescriptor()));
+  std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_fd));
 
-  msg << "XrdCephOssBufferedFile::Open: fd: " << m_xrdOssDF->getFileDescriptor() 
-        <<  ". Buffer created: " << cephbuffer->capacity();
-  XrdCephEroute.Say(msg.str().c_str());
+  LOGCEPH( "XrdCephOssBufferedFile::Open: fd: " << m_fd <<  " Buffer created: " << cephbuffer->capacity() );
+  m_bufferAlg = std::unique_ptr<IXrdCephBufferAlg>(new XrdCephBufferAlgSimple(std::move(cephbuffer),std::move(cephio),m_fd) );
 
-  // #TODO, use make_unique when c++14 is used
-  //m_bufferAlg = std::make_unique<XrdCephBufferAlgSimple>(cephbuffer,cephio,m_xrdOssDF->getFileDescriptor());
-  m_bufferAlg = std::unique_ptr<IXrdCephBufferAlg>(new XrdCephBufferAlgSimple(std::move(cephbuffer),std::move(cephio),m_xrdOssDF->getFileDescriptor()) );
-
+  // return the file descriptor 
   return rc;
 }
 
 int XrdCephOssBufferedFile::Close(long long *retsz) {
+  // if data is still in the buffer and we are writing, make sure to write it to 
   if ((m_flags & (O_WRONLY|O_RDWR)) != 0) {
     ssize_t rc = m_bufferAlg->flushWriteCache();
     if (rc < 0) {
-        std::stringstream msg; 
-        msg << "XrdCephOssBufferedFile::Close: flush  fd: " << m_xrdOssDF->getFileDescriptor() ;
-        XrdCephEroute.Say(msg.str().c_str());
+        // std::stringstream msg; 
+        // msg << "XrdCephOssBufferedFile::Close: flush Error fd: " << m_fd << " rc:" << rc  ;
+        //LOGCEPH(msg);
+        LOGCEPH( "XrdCephOssBufferedFile::Close: flush Error fd: " << m_fd << " rc:" << rc );
         return rc;
     }
   } // check for write
   
-
   return m_xrdOssDF->Close(retsz);
 }
 
 
 ssize_t XrdCephOssBufferedFile::ReadV(XrdOucIOVec *readV, int rnum) {
-  // direct copy of upstream version
-    int nbytes = 0, curCount = 0;
-
-    for (int i = 0; i < rnum; i++)
-    {
-      curCount = m_xrdOssDF->Read(readV[i].data, readV[i].offset, readV[i].size);
-      if (curCount != readV[i].size)
-        return (curCount < 0 ? curCount : -ESPIPE);
-      nbytes += curCount;
-    }
-    return nbytes;
+  // don't touch readV in the buffering method
+  return m_xrdOssDF->ReadV(readV,rnum);
 }
 
 ssize_t XrdCephOssBufferedFile::Read(off_t offset, size_t blen) {
@@ -133,27 +113,26 @@ ssize_t XrdCephOssBufferedFile::Read(off_t offset, size_t blen) {
 }
 
 ssize_t XrdCephOssBufferedFile::Read(void *buff, off_t offset, size_t blen) {
-  std::stringstream msg; 
-  msg << "XrdCephOssBufferedFile::Read: " <<  offset << "  " << blen;
-  XrdCephEroute.Say(msg.str().c_str());
-  //  return m_xrdOssDF->Read(buff,offset,blen);
+  // std::stringstream msg; 
+  // msg << "XrdCephOssBufferedFile::Read: " <<  offset << "  " << blen;
+  // XrdCephEroute.Say(msg.str().c_str());
+  // //  return m_xrdOssDF->Read(buff,offset,blen);
   return m_bufferAlg->read(buff, offset, blen);
 }
 
 int XrdCephOssBufferedFile::Read(XrdSfsAio *aiop) {
 
-  std::stringstream msg; msg << "XrdCephOssBufferedFile::AIOREAD: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  << time(nullptr) << " : " 
+  LOGCEPH("XrdCephOssBufferedFile::AIOREAD: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  << time(nullptr) << " : " 
           << aiop->sfsAio.aio_offset << " " 
           << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
-          << aiop->sfsAio.aio_fildes << " " ;
-  XrdCephEroute.Say(msg.str().c_str());
+          << aiop->sfsAio.aio_fildes );
   
-  //return m_xrdOssDF->Read(aiop);
   return m_bufferAlg->read_aio(aiop);
 
 }
 
 ssize_t XrdCephOssBufferedFile::ReadRaw(void *buff, off_t offset, size_t blen) {
+  // #TODO; ReadRaw should bypass the buffer ?
   return m_xrdOssDF->ReadRaw(buff, offset, blen);
 }
 
@@ -163,18 +142,16 @@ int XrdCephOssBufferedFile::Fstat(struct stat *buff) {
 
 ssize_t XrdCephOssBufferedFile::Write(const void *buff, off_t offset, size_t blen) {
   //return m_xrdOssDF->Write(buff, offset,blen );
-  std::stringstream msg; msg << "XrdCephOssBufferedFile::Write: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  <<  offset << "  " << blen;
-  XrdCephEroute.Say(msg.str().c_str());
+  LOGCEPH("XrdCephOssBufferedFile::Write: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  <<  offset << "  " << blen);
   return m_bufferAlg->write(buff, offset, blen);
 }
 
 int XrdCephOssBufferedFile::Write(XrdSfsAio *aiop) {
-  std::stringstream msg; msg << "XrdCephOssBufferedFile::AIOWRITE: fd: " << m_xrdOssDF->getFileDescriptor() << "  "   << time(nullptr) << " : " 
+  LOGCEPH("XrdCephOssBufferedFile::AIOWRITE: fd: " << m_xrdOssDF->getFileDescriptor() << "  "   << time(nullptr) << " : " 
           << aiop->sfsAio.aio_offset << " " 
           << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
-          << aiop->sfsAio.aio_fildes << " " ;
-  XrdCephEroute.Say(msg.str().c_str());
-  //return m_xrdOssDF->Write(aiop); // pass through (slow) for now
+          << aiop->sfsAio.aio_fildes << " " );
+
   return m_bufferAlg->write_aio(aiop);
 }
 
