@@ -51,6 +51,7 @@ add_library(
   XrdCeph/XrdCephBuffers/XrdCephBufferDataSimple.cc XrdCeph/XrdCephBuffers/XrdCephBufferDataSimple.hh
   XrdCeph/XrdCephBuffers/XrdCephBufferAlgSimple.cc  XrdCeph/XrdCephBuffers/XrdCephBufferAlgSimple.hh 
   XrdCeph/XrdCephBuffers/CephIOAdapterRaw.cc  XrdCeph/XrdCephBuffers/CephIOAdapterRaw.hh
+  XrdCeph/XrdCephBuffers/CephIOAdapterAIORaw.cc  XrdCeph/XrdCephBuffers/CephIOAdapterAIORaw.hh
   XrdCeph/XrdCephBuffers/BufferUtils.cc  XrdCeph/XrdCephBuffers/BufferUtils.hh
   XrdCeph/XrdCephBuffers/XrdCephReadVNoOp.cc  XrdCeph/XrdCephBuffers/XrdCephReadVNoOp.hh
   XrdCeph/XrdCephBuffers/XrdCephReadVBasic.cc  XrdCeph/XrdCephBuffers/XrdCephReadVBasic.hh
