@@ -29,8 +29,8 @@ XrdCephBufferAlgSimple::~XrdCephBufferAlgSimple() {
 
 ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
     // Currently this is not supported, and callers using this should recieve the appropriate error code
-    return -ENOSYS;
-    /*
+    //return -ENOSYS;
+    
     ssize_t rc(-ENOSYS);
     if (!aoip) {
         return -EINVAL; 
@@ -48,13 +48,13 @@ ssize_t XrdCephBufferAlgSimple::read_aio (XrdSfsAio *aoip) {
     aoip->doneRead();
 
     return rc;
-    */
+    
 }
 
 ssize_t XrdCephBufferAlgSimple::write_aio(XrdSfsAio *aoip) {
     // Currently this is not supported, and callers using this should recieve the appropriate error code
-    return -ENOSYS;
-    /*
+   // return -ENOSYS;
+    
     ssize_t rc(-ENOSYS);
         if (!aoip) {
              return -EINVAL; 
@@ -70,7 +70,7 @@ ssize_t XrdCephBufferAlgSimple::write_aio(XrdSfsAio *aoip) {
     aoip->Result = rc;
     aoip->doneWrite();
     return rc;
-    */
+    
 }
 
 
@@ -319,6 +319,11 @@ ssize_t XrdCephBufferAlgSimple::flushWriteCache()  {
     const std::lock_guard<std::recursive_mutex> lock(m_data_mutex); // 
     BUFLOG("flushWriteCache: " << m_bufferStartingOffset << " " << m_bufferLength);
     ssize_t rc(-1);
+    if (m_bufferLength == 0) {
+            BUFLOG("Empty buffer to flush: ");
+            rc = 0; // not an issue
+    }
+
     if (m_bufferLength > 0) {
         rc = m_cephio->write(m_bufferStartingOffset, m_bufferLength);
         if (rc < 0) {

@@ -39,6 +39,7 @@
 #include "XrdCeph/XrdCephBuffers/XrdCephBufferAlgSimple.hh"
 #include "XrdCeph/XrdCephBuffers/XrdCephBufferDataSimple.hh"
 #include "XrdCeph/XrdCephBuffers/CephIOAdapterRaw.hh"
+#include "XrdCeph/XrdCephBuffers/CephIOAdapterAIORaw.hh"
 
 using namespace XrdCephBuffer;
 
@@ -72,12 +73,14 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
     return rc;
   }
   m_fd = m_xrdOssDF->getFileDescriptor();
+  BUFLOG("XrdCephOssBufferedFile::Open got fd: " << rc);
   m_flags = flags; // e.g. for write/read knowledge
 
   // opened a file, so create the buffer here; note - this might be better delegated to the first read/write ...
   // need the file descriptor, so do it after we know the file is opened (and not just a stat for example)
   std::unique_ptr<IXrdCephBufferData> cephbuffer = std::unique_ptr<IXrdCephBufferData>(new XrdCephBufferDataSimple(m_bufsize));
-  std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_fd));
+  // std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_fd));
+  std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterAIORaw(cephbuffer.get(),m_fd));
 
   LOGCEPH( "XrdCephOssBufferedFile::Open: fd: " << m_fd <<  " Buffer created: " << cephbuffer->capacity() );
   m_bufferAlg = std::unique_ptr<IXrdCephBufferAlg>(new XrdCephBufferAlgSimple(std::move(cephbuffer),std::move(cephio),m_fd) );
@@ -91,11 +94,13 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
   if ((m_flags & (O_WRONLY|O_RDWR)) != 0) {
     ssize_t rc = m_bufferAlg->flushWriteCache();
     if (rc < 0) {
-        // std::stringstream msg; 
-        // msg << "XrdCephOssBufferedFile::Close: flush Error fd: " << m_fd << " rc:" << rc  ;
-        //LOGCEPH(msg);
         LOGCEPH( "XrdCephOssBufferedFile::Close: flush Error fd: " << m_fd << " rc:" << rc );
-        return rc;
+        // still try to close the file
+        ssize_t rc2 = m_xrdOssDF->Close(retsz);
+        if (rc2 < 0) {
+          LOGCEPH( "XrdCephOssBufferedFile::Close: Close error after flush Error fd: " << m_fd << " rc:" << rc2 );
+        }
+        return rc; // return the original flush error
     }
   } // check for write
   
@@ -113,10 +118,6 @@ ssize_t XrdCephOssBufferedFile::Read(off_t offset, size_t blen) {
 }
 
 ssize_t XrdCephOssBufferedFile::Read(void *buff, off_t offset, size_t blen) {
-  // std::stringstream msg; 
-  // msg << "XrdCephOssBufferedFile::Read: " <<  offset << "  " << blen;
-  // XrdCephEroute.Say(msg.str().c_str());
-  // //  return m_xrdOssDF->Read(buff,offset,blen);
   return m_bufferAlg->read(buff, offset, blen);
 }
 
@@ -141,8 +142,6 @@ int XrdCephOssBufferedFile::Fstat(struct stat *buff) {
 }
 
 ssize_t XrdCephOssBufferedFile::Write(const void *buff, off_t offset, size_t blen) {
-  //return m_xrdOssDF->Write(buff, offset,blen );
-  LOGCEPH("XrdCephOssBufferedFile::Write: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  <<  offset << "  " << blen);
   return m_bufferAlg->write(buff, offset, blen);
 }
 

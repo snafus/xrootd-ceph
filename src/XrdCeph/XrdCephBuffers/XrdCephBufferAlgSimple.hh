@@ -37,6 +37,7 @@ class XrdCephBufferAlgSimple : public virtual  IXrdCephBufferAlg {
         virtual ssize_t write(const void *buff, off_t offset, size_t blen) override;
         virtual ssize_t flushWriteCache() override; 
 
+        // #REVIEW
         virtual const IXrdCephBufferData *buffer() const {return m_bufferdata.get();}
         virtual IXrdCephBufferData *buffer() {return m_bufferdata.get();}
 
