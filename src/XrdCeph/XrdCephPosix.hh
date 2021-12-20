@@ -41,7 +41,8 @@
   // ensure that 
   //   extern XrdOucTrace XrdCephTrace; 
   // is in the cc file where you want to log // << std::endl
-  #define LOGCEPH(x) {std::stringstream _s; _s << x;   XrdCephTrace.Beg(); std::clog << _s.str() ; XrdCephTrace.End(); _s.clear();}
+  //#define LOGCEPH(x) {std::stringstream _s; _s << x;   XrdCephTrace.Beg(); std::clog << _s.str() ; XrdCephTrace.End(); _s.clear();}
+  #define LOGCEPH(x) {std::stringstream _s; _s << x;  std::clog << _s.str() << std::endl; _s.clear(); }
 #else 
   #define LOGCEPH(x) 
 #endif 
