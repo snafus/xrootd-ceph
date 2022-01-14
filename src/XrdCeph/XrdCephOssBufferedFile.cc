@@ -73,7 +73,7 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
     return rc;
   }
   m_fd = m_xrdOssDF->getFileDescriptor();
-  BUFLOG("XrdCephOssBufferedFile::Open got fd: " << rc);
+  BUFLOG("XrdCephOssBufferedFile::Open got fd: " << m_fd << " " << path);
   m_flags = flags; // e.g. for write/read knowledge
 
   // opened a file, so create the buffer here; note - this might be better delegated to the first read/write ...
@@ -100,6 +100,8 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
         if (rc2 < 0) {
           LOGCEPH( "XrdCephOssBufferedFile::Close: Close error after flush Error fd: " << m_fd << " rc:" << rc2 );
         }
+        // still attempt to close the file; ignore the return error here
+        m_xrdOssDF->Close(retsz);
         return rc; // return the original flush error
     }
   } // check for write

@@ -113,7 +113,7 @@ ssize_t XrdCephBufferDataSimple::readBuffer(void* buf, off_t offset, size_t blen
         // std::copy(rawbufstart + offset, rawbufstart+offset+readlength, reinterpret_cast<char*>(buf) );
         memcpy(reinterpret_cast<char*>(buf), rawbufstart + offset, readlength);
     } // end Timer
-    //BUFLOG("XrdCephBufferDataSimple::readBuffer: " << offset << " " << readlength << " " << int_ns );
+    // BUFLOG("XrdCephBufferDataSimple::readBuffer: " << offset << " " << readlength << " " << int_ns );
 
     return readlength;
 }
@@ -152,7 +152,7 @@ ssize_t XrdCephBufferDataSimple::writeBuffer(const void* buf, off_t offset, size
 
     } // end Timer
 
-    //BUFLOG("XrdCephBufferDataSimple::writeBuffer: " << offset << " " << readBytes << " " << int_ns);
+    // BUFLOG("XrdCephBufferDataSimple::writeBuffer: " << offset << " " << readBytes << " " << int_ns);
 
 
 
