@@ -80,7 +80,7 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
     // No call to flushCache should happen in a read, but be consistent
     const std::lock_guard<std::recursive_mutex> lock(m_data_mutex); // 
 
-    BUFLOG("XrdCephBufferAlgSimple::read: " << offset << " " << blen);
+    //BUFLOG("XrdCephBufferAlgSimple::read: " << offset << " " << blen);
     if (blen == 0) return 0;
 
     /**
@@ -88,8 +88,8 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
      * Invalidate the cache in anycase
      */
     if (blen >= m_bufferdata->capacity()) {
-        BUFLOG("XrdCephBufferAlgSimple::read: Readthrough cache: fd: " << m_fd 
-                  << " " << offset << " " << blen);
+        //BUFLOG("XrdCephBufferAlgSimple::read: Readthrough cache: fd: " << m_fd 
+        //          << " " << offset << " " << blen);
         // larger than cache, so read through, and invalidate the cache anyway
         m_bufferdata->invalidate();
         // #FIXME JW: const_cast is probably a bit poor.
@@ -126,7 +126,7 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
         if (loadCache) {
             m_bufferdata->invalidate();
             rc = m_cephio->read(offset + offsetDelta, m_bufferdata->capacity()); // fill the cache
-            BUFLOG("LoadCache ReadToCache: " << rc << " " << offset + offsetDelta << " " << m_bufferdata->capacity() );
+            //BUFLOG("LoadCache ReadToCache: " << rc << " " << offset + offsetDelta << " " << m_bufferdata->capacity() );
             if (rc < 0) {
                 BUFLOG("LoadCache Error: " << rc);
                 return rc;// TODO return correct errors
@@ -149,12 +149,12 @@ ssize_t XrdCephBufferAlgSimple::read(volatile void *buf,   off_t offset, size_t 
         }
         if (rc == 0) {
             // no bytes returned; much be at end of file
-            BUFLOG("No bytes returned: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining);
+            //BUFLOG("No bytes returned: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining);
             break; // leave the loop even though bytesremaing is probably >=0.
             //i.e. requested a full buffers worth, but only a fraction of the file is here.
         }
 
-        BUFLOG("End of loop: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining);
+        //BUFLOG("End of loop: " << rc << "  " << offset << " + " << offsetDelta << "; " << blen << " : " << bytesRemaining);
         offsetDelta    += rc; 
         bytesRemaining -= rc;
         bytesRead      += rc;
@@ -307,7 +307,7 @@ ssize_t XrdCephBufferAlgSimple::write (const void *buf, off_t offset, size_t ble
         bytesWrittenToStorage += rc;
     } // at capacity;
 
-    BUFLOG( "WriteBuffer " << bytesWritten << " " << bytesWrittenToStorage << "  " << offset << "  " << blen << " " );
+    //BUFLOG( "WriteBuffer " << bytesWritten << " " << bytesWrittenToStorage << "  " << offset << "  " << blen << " " );
     return bytesWritten;
 }
 
@@ -317,7 +317,7 @@ ssize_t XrdCephBufferAlgSimple::flushWriteCache()  {
     // Set a lock for any attempt at a simultaneous operation
     // Use recursive, as write (and read) also calls the lock and don't want to deadlock
     const std::lock_guard<std::recursive_mutex> lock(m_data_mutex); // 
-    BUFLOG("flushWriteCache: " << m_bufferStartingOffset << " " << m_bufferLength);
+    // BUFLOG("flushWriteCache: " << m_bufferStartingOffset << " " << m_bufferLength);
     ssize_t rc(-1);
     if (m_bufferLength == 0) {
             BUFLOG("Empty buffer to flush: ");

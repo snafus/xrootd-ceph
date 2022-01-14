@@ -123,10 +123,10 @@ ssize_t XrdCephOssBufferedFile::Read(void *buff, off_t offset, size_t blen) {
 
 int XrdCephOssBufferedFile::Read(XrdSfsAio *aiop) {
 
-  LOGCEPH("XrdCephOssBufferedFile::AIOREAD: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  << time(nullptr) << " : " 
-          << aiop->sfsAio.aio_offset << " " 
-          << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
-          << aiop->sfsAio.aio_fildes );
+  // LOGCEPH("XrdCephOssBufferedFile::AIOREAD: fd: " << m_xrdOssDF->getFileDescriptor() << "  "  << time(nullptr) << " : " 
+  //         << aiop->sfsAio.aio_offset << " " 
+  //         << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
+  //         << aiop->sfsAio.aio_fildes );
   
   return m_bufferAlg->read_aio(aiop);
 
@@ -146,10 +146,10 @@ ssize_t XrdCephOssBufferedFile::Write(const void *buff, off_t offset, size_t ble
 }
 
 int XrdCephOssBufferedFile::Write(XrdSfsAio *aiop) {
-  LOGCEPH("XrdCephOssBufferedFile::AIOWRITE: fd: " << m_xrdOssDF->getFileDescriptor() << "  "   << time(nullptr) << " : " 
-          << aiop->sfsAio.aio_offset << " " 
-          << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
-          << aiop->sfsAio.aio_fildes << " " );
+  // LOGCEPH("XrdCephOssBufferedFile::AIOWRITE: fd: " << m_xrdOssDF->getFileDescriptor() << "  "   << time(nullptr) << " : " 
+  //         << aiop->sfsAio.aio_offset << " " 
+  //         << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
+  //         << aiop->sfsAio.aio_fildes << " " );
 
   return m_bufferAlg->write_aio(aiop);
 }
