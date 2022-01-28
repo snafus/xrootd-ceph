@@ -34,6 +34,8 @@
 #include "XrdCeph/XrdCephBuffers/IXrdCephReadVAdapter.hh"
 
 #include <memory>
+#include <chrono>
+#include <atomic>
 
 
 //------------------------------------------------------------------------------
@@ -68,6 +70,13 @@ protected:
 
   int m_flags = 0;
   size_t m_bufsize = 16*1024*1024L; // default 16MiB size
+  std::string m_path;
+  std::chrono::time_point<std::chrono::system_clock> m_timestart;
+  std::atomic<size_t> m_bytesRead    = {0}; /// number of bytes read or written
+  std::atomic<size_t> m_bytesReadV   = {0}; /// number of bytes read or written
+  std::atomic<size_t> m_bytesReadAIO = {0}; /// number of bytes read or written
+  std::atomic<size_t> m_bytesWrite   = {0}; /// number of bytes read or written
+  std::atomic<size_t> m_bytesWriteAIO= {0}; /// number of bytes read or written
 };
 
 #endif /* __XRD_CEPH_OSS_BUFFERED_FILE_HH__ */

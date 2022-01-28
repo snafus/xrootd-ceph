@@ -161,7 +161,7 @@ ssize_t XrdCephBufferDataSimple::writeBuffer(const void* buf, off_t offset, size
     // note; unless invalidate is called, then this value may not be correctly set ... 
     m_bufLength      = std::max(offset+blen, m_bufLength);
     m_valid          = true;
-
+ 
 
     return readBytes;
 } 
