@@ -34,7 +34,7 @@ ssize_t CephIOAdapterRaw::write(off64_t offset,size_t count) {
     auto end = std::chrono::steady_clock::now();
     auto int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
 
-    BUFLOG("CephIOAdapterRaw::write fd:" << m_fd << " " 
+    BUFLOG("CephIOAdapterRaw::write fd:" << m_fd << " " << rc << " "
               <<  offset << " " << count << " " << rc << " " << int_ms.count() );
 
     if (rc < 0) return rc;
@@ -66,7 +66,7 @@ ssize_t CephIOAdapterRaw::read(off64_t offset, size_t count) {
     m_stats_read_bytes.fetch_add(rc);
     ++m_stats_read_req;
 
-    BUFLOG("CephIOAdapterRaw::read fd:" << m_fd << " " << offset
+    BUFLOG("CephIOAdapterRaw::read fd:" << m_fd << " " << rc << " " << offset
              << " " << count << " " << rc << " " << int_ms.count() );
 
     if (rc>=0) {

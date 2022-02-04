@@ -21,14 +21,11 @@ namespace
   {
     // as in XrdCephOssFile
     aiop->Result = rc;
-    // std::this_thread::sleep_for(std::chrono::seconds(10));
-    //BUFLOG("aioReadCallback " << rc);
     aiop->doneRead();
   }
   static void aioWriteCallback(XrdSfsAio *aiop, size_t rc)
   {
     aiop->Result = rc;
-    //BUFLOG("aioWriteCallback " << rc);
     aiop->doneWrite();
   }
 
@@ -60,7 +57,7 @@ CephIOAdapterAIORaw::CephIOAdapterAIORaw(IXrdCephBufferData *bufferdata, int fd)
 
 CephIOAdapterAIORaw::~CephIOAdapterAIORaw()
 {
-  // nothing to specifically delete; just print out some stats if in debug
+  // nothing to specifically to do; just print out some stats
   float read_speed{0}, write_speed{0};
   if (m_stats_read_req.load() > 0) {
     read_speed = m_stats_read_bytes.load() / m_stats_read_timer.load() * 1e-3;
@@ -95,21 +92,17 @@ ssize_t CephIOAdapterAIORaw::write(off64_t offset, size_t count)
 
   long dt_ns{0};
   ssize_t rc{0};
-  {
+  { // brace is for timer RAII
     XrdCephBuffer::Timer_ns timer(dt_ns);
-    //BUFLOG("Submit aio write: ");
     rc = ceph_aio_write(m_fd, aiop.get(), aioWriteCallback);
-    //BUFLOG("Write aio submit done: " << rc);
 
     if (rc < 0)
       return rc;
 
-    //BUFLOG("Wait cond: ");
     while (!ceph_aiop->isDone())
     {
       ceph_aiop->m_condVar.wait(ceph_aiop->m_lock, std::bind(&CephBufSfsAio::isDone, ceph_aiop));
     }
-    //BUFLOG("Done wait cond: ");
   } // timer brace
 
   // cleanup
@@ -133,7 +126,6 @@ ssize_t CephIOAdapterAIORaw::read(off64_t offset, size_t count)
     return -EINVAL;
   }
 
-  //BUFLOG("Make aio");
   std::unique_ptr<XrdSfsAio> aiop = std::unique_ptr<XrdSfsAio>(new CephBufSfsAio());
   aiocb &sfsAio = aiop->sfsAio;
   // set the necessary parameters for the read, e.g. buffer pointer, offset and length
@@ -145,29 +137,23 @@ ssize_t CephIOAdapterAIORaw::read(off64_t offset, size_t count)
 
   long dt_ns{0};
   ssize_t rc{0};
-  {
+  { // timer brace RAII
     XrdCephBuffer::Timer_ns timer(dt_ns);
     // no check is made whether the buffer has sufficient capacity
     //      rc = ceph_posix_pread(m_fd,buf,count,offset);
     //BUFLOG("Submit aio read: ");
     rc = ceph_aio_read(m_fd, aiop.get(), aioReadCallback);
-    //BUFLOG("Read aio submit done: " << rc);
 
     if (rc < 0)
       return rc;
 
     // now block until the read is done
     // take the lock on the aio object
-    //BUFLOG("Getting lock: ");
-    //std::unique_lock<std::mutex> lock(ceph_aiop->m_mutex);
-    // now wait for the condition variable to be set
-    //BUFLOG("Wait cond: ");
     // while(!ceph_aiop->isDone()) { ceph_aiop->m_condVar.wait(lock,std::bind(&CephBufSfsAio::isDone,ceph_aiop) ); }
     while (!ceph_aiop->isDone())
     {
       ceph_aiop->m_condVar.wait(ceph_aiop->m_lock, std::bind(&CephBufSfsAio::isDone, ceph_aiop));
     }
-    //BUFLOG("Done wait cond: ");
   } // timer brace
 
   // cleanup

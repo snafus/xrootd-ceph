@@ -121,8 +121,8 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
   LOGCEPH("XrdCephOssBufferedFile::Summary: {\"fd\":" << m_fd << ", \"Elapsed_time_ms\":" << t_dur 
           << ", \"path\":\"" << m_path  
           << "\", read_B:"   << m_bytesRead.load() 
-          << ", readV_B"     << m_bytesReadV.load() 
-          << ", readAIO_B"   << m_bytesReadAIO.load() 
+          << ", readV_B:"     << m_bytesReadV.load() 
+          << ", readAIO_B:"   << m_bytesReadAIO.load() 
           << ", writeB:"     << m_bytesWrite.load()
           << ", writeAIO_B:" << m_bytesWriteAIO.load()
           << ", startTime:\"" << std::put_time(std::localtime(&t_s), "%F %T") << "\", endTime:\"" 

@@ -94,17 +94,17 @@ ssize_t XrdCephOssReadVFile::ReadV(XrdOucIOVec *readV, int rnum) {
   int fd = m_xrdOssDF->getFileDescriptor();
   LOGCEPH("XrdCephOssReadVFile::ReadV: fd: " << fd  << " " << rnum << "\n" );
 
-  std::stringstream msg_extents; 
-  msg_extents << "EXTENTS=[";
+  //std::stringstream msg_extents; 
+  //msg_extents << "EXTENTS=[";
 
   ExtentHolder extents(rnum);
   for (int i = 0; i < rnum; i++) {
     extents.push_back(Extent(readV[i].offset, readV[i].size));
-    msg_extents << "(" << readV[i].offset << "," << readV[i].size << ")," ;
+    //msg_extents << "(" << readV[i].offset << "," << readV[i].size << ")," ;
   }
-  msg_extents << "]";
+  //msg_extents << "]";
   //XrdCephEroute.Say(msg_extents.str().c_str()); msg_extents.clear();
-  LOGCEPH(msg_extents.str());
+  //LOGCEPH(msg_extents.str());
 
   LOGCEPH("Extents: fd: "<< fd << " "  << extents.size() << " " << extents.len() << " " 
       << extents.begin() << " " << extents.end() << " " << extents.bytesContained() 
@@ -127,12 +127,12 @@ ssize_t XrdCephOssReadVFile::ReadV(XrdOucIOVec *readV, int rnum) {
   buffer.reserve(buffersize);
 
 
-  LOGCEPH("mappedExtents: len: " << mappedExtents.size() );
+  //LOGCEPH("mappedExtents: len: " << mappedExtents.size() );
   for (std::vector<ExtentHolder>::const_iterator ehit = mappedExtents.cbegin(); ehit!= mappedExtents.cend(); ++ehit ) {
     off_t off = ehit->begin();
     size_t len = ehit->len();
 
-    LOGCEPH("outerloop: " << off << " " << len << " " << ehit->end() << " " << " " << ehit->size() );
+    //LOGCEPH("outerloop: " << off << " " << len << " " << ehit->end() << " " << " " << ehit->size() );
 
     // read the full extent into the buffer
     long timed_read_ns{0};
@@ -160,9 +160,9 @@ ssize_t XrdCephOssReadVFile::ReadV(XrdOucIOVec *readV, int rnum) {
     for (ExtentContainer::const_iterator it = innerExtents.cbegin(); it != innerExtents.cend(); ++it) {
       off_t innerBegin = it->begin() - off;
       off_t innerEnd   = it->end()   - off; 
-      LOGCEPH( "innerloop: " << innerBegin << " " << innerEnd << " " << off << " " 
-                << it->begin() << " " << it-> end() << " " 
-                << readV[counter].offset << " " << readV[counter].size);
+      //LOGCEPH( "innerloop: " << innerBegin << " " << innerEnd << " " << off << " " 
+      //          << it->begin() << " " << it-> end() << " " 
+      //          << readV[counter].offset << " " << readV[counter].size);
       std::copy(data+innerBegin, data+innerEnd, readV[counter].data );
       nbytes += it->len();
       ++counter; // next element
