@@ -96,7 +96,7 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
 }
 
 int XrdCephOssBufferedFile::Close(long long *retsz) {
-  // if data is still in the buffer and we are writing, make sure to write it to 
+  // if data is still in the buffer and we are writing, make sure to write it
   if ((m_flags & (O_WRONLY|O_RDWR)) != 0) {
     ssize_t rc = m_bufferAlg->flushWriteCache();
     if (rc < 0) {
@@ -107,6 +107,8 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
           LOGCEPH( "XrdCephOssBufferedFile::Close: Close error after flush Error fd: " << m_fd << " rc:" << rc2 );
         }
         return rc; // return the original flush error
+    } else {
+      LOGCEPH( "XrdCephOssBufferedFile::Close: Flushed data on close fd: " << m_fd << " rc:" << rc );
     }
   } // check for write
   const std::chrono::time_point<std::chrono::system_clock> now =
@@ -146,6 +148,8 @@ ssize_t XrdCephOssBufferedFile::Read(void *buff, off_t offset, size_t blen) {
   ssize_t rc = m_bufferAlg->read(buff, offset, blen);
   if (rc >=0) {
     m_bytesRead.fetch_add(rc);
+  } else {
+    LOGCEPH( "XrdCephOssBufferedFile::Read: Read error  fd: " << m_fd << " rc:" << rc  << " off:" << offset << " len:" << blen);
   }
   return rc;
 }
@@ -157,7 +161,12 @@ int XrdCephOssBufferedFile::Read(XrdSfsAio *aiop) {
   //         << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
   //         << aiop->sfsAio.aio_fildes );
   ssize_t rc = m_bufferAlg->read_aio(aiop);
-  if (rc > 0) m_bytesReadAIO.fetch_add(rc);
+  if (rc > 0) {
+    m_bytesReadAIO.fetch_add(rc);
+  }  else {
+    LOGCEPH( "XrdCephOssBufferedFile::Read: ReadAIO error  fd: " << m_fd << " rc:" << rc  
+            << " off:" << aiop->sfsAio.aio_offset << " len:" << aiop->sfsAio.aio_nbytes );
+  }
   return rc;
 }
 
@@ -174,6 +183,8 @@ ssize_t XrdCephOssBufferedFile::Write(const void *buff, off_t offset, size_t ble
   ssize_t rc = m_bufferAlg->write(buff, offset, blen);
   if (rc >=0) {
     m_bytesWrite.fetch_add(rc);
+  }  else {
+    LOGCEPH( "XrdCephOssBufferedFile::Write: Write error  fd: " << m_fd << " rc:" << rc  << " off:" << offset << " len:" << blen);
   }
   return rc;
 }
@@ -184,7 +195,12 @@ int XrdCephOssBufferedFile::Write(XrdSfsAio *aiop) {
   //         << aiop->sfsAio.aio_nbytes << " " << aiop->sfsAio.aio_reqprio << " "
   //         << aiop->sfsAio.aio_fildes << " " );
   ssize_t rc = m_bufferAlg->write_aio(aiop);
-  if (rc > 0) m_bytesWriteAIO.fetch_add(rc);
+  if (rc > 0) {
+     m_bytesWriteAIO.fetch_add(rc);
+  }   else {
+    LOGCEPH( "XrdCephOssBufferedFile::Write: WriteAIO error  fd: " << m_fd << " rc:" << rc  
+            << " off:" << aiop->sfsAio.aio_offset << " len:" << aiop->sfsAio.aio_nbytes );
+  }
   return rc;
 
 }

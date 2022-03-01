@@ -77,9 +77,10 @@ CephIOAdapterAIORaw::~CephIOAdapterAIORaw()
 ssize_t CephIOAdapterAIORaw::write(off64_t offset, size_t count)
 {
   void *buf = m_bufferdata->raw();
-  if (!buf)
+  if (!buf) {
+    BUFLOG("CephIOAdapterAIORaw::write null buffer was provided.")
     return -EINVAL; 
-
+  }
   //BUFLOG("Make aio");
   std::unique_ptr<XrdSfsAio> aiop = std::unique_ptr<XrdSfsAio>(new CephBufSfsAio());
   aiocb &sfsAio = aiop->sfsAio;
@@ -96,8 +97,10 @@ ssize_t CephIOAdapterAIORaw::write(off64_t offset, size_t count)
     XrdCephBuffer::Timer_ns timer(dt_ns);
     rc = ceph_aio_write(m_fd, aiop.get(), aioWriteCallback);
 
-    if (rc < 0)
+    if (rc < 0) {
+      BUFLOG("CephIOAdapterAIORaw::write ceph_aio_write returned rc:" << rc)
       return rc;
+    }
 
     while (!ceph_aiop->isDone())
     {
@@ -107,6 +110,9 @@ ssize_t CephIOAdapterAIORaw::write(off64_t offset, size_t count)
 
   // cleanup
   rc = ceph_aiop->Result;
+  if (rc < 0) {
+      BUFLOG("CephIOAdapterAIORaw::write ceph_aiop->Result returned rc:" << rc)
+  }
 
   // BUFLOG("CephIOAdapterAIORaw::write fd:" << m_fd << " off:"
   //                                         << offset << " len:" << count << " rc:" << rc << " ms:" << dt_ns / 1000000);
@@ -123,6 +129,7 @@ ssize_t CephIOAdapterAIORaw::read(off64_t offset, size_t count)
   void *buf = m_bufferdata->raw();
   if (!buf)
   {
+    BUFLOG("CephIOAdapterAIORaw::read null buffer was provided.")
     return -EINVAL;
   }
 
