@@ -106,8 +106,6 @@ int XrdCephOssBufferedFile::Close(long long *retsz) {
         if (rc2 < 0) {
           LOGCEPH( "XrdCephOssBufferedFile::Close: Close error after flush Error fd: " << m_fd << " rc:" << rc2 );
         }
-        // still attempt to close the file; ignore the return error here
-        m_xrdOssDF->Close(retsz);
         return rc; // return the original flush error
     }
   } // check for write
