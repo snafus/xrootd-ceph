@@ -126,17 +126,21 @@ ssize_t XrdCephBufferDataSimple::writeBuffer(const void* buf, off_t offset, size
     //invalidate();
 
     if (offset < 0) {
+        BUFLOG("XrdCephBufferDataSimple::writeBuffer: offset <0");
         return -EINVAL;
     }
 
     ssize_t cap = capacity();
     if ((ssize_t)blen > cap) {
+        BUFLOG("XrdCephBufferDataSimple::writeBuffer: blen > cap:" << blen << " > " << cap);
         return -EINVAL;
     }
     if ((ssize_t)offset > cap) {
+        BUFLOG("XrdCephBufferDataSimple::writeBuffer: offset > cap:" << offset << " > " << cap);
         return -EINVAL;
     }
     if (ssize_t(offset + blen) > cap) {
+        BUFLOG("XrdCephBufferDataSimple::writeBuffer: (offset + blen) > cap: (" << offset << " + " << blen << ") >" << cap);
         return -EINVAL;
     }
 
