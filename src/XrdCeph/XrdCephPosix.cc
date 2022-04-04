@@ -50,6 +50,36 @@
 
 #include "XrdCeph/XrdCephPosix.hh"
 
+#include <iostream>
+
+/*JW: wrapper to avoid busy commands leaving XrdCeph.
+* If a busy type return code propagates up to here, it should either
+* be treated within this code, or returned as an error to the client.
+* Letting the client retry, what it things is temporary problem can lead to 
+* more issues.
+*/
+inline int wrapBusyRc(int rc, int mappedRc=EIO) {
+  // assumes the input rc is +ve; calling function should return the -ve, if needed
+  // This should be infrequent, so not concerned of performance of switch
+  int output {rc};
+  switch (rc) {
+    case EBUSY:
+      output = mappedRc;
+      break;
+    case EAGAIN:
+      output = mappedRc;
+       break;
+    // case EWOULDBLOCK: // same value as EAGAIN
+    //   output = mappedRc;
+    //   break;
+    default:
+      break; // already set to be rc
+  }
+  std::clog << "Wrapped rc: " << rc << " to << " << output << std::endl;
+  return rc;
+}
+
+
 /// small structs to store file metadata
 struct CephFile {
   std::string name;
@@ -139,6 +169,7 @@ unsigned int getCephPoolIdxAndIncrease() {
     // double check now that we have the lock
     if (g_radosStripers.size() == 0) {
       // initialization phase : allocate corresponding places in the vectors
+      std::clog << "JW getCephPoolIdxAndIncrease : Creating " << g_maxCephPoolIdx << " pools"  << std::endl;
       for (unsigned int i = 0; i < g_maxCephPoolIdx; i++) {
         g_radosStripers.push_back(StriperDict());
         g_ioCtx.push_back(IOCtxDict());
@@ -151,6 +182,7 @@ unsigned int getCephPoolIdxAndIncrease() {
   if (nextValue >= g_maxCephPoolIdx) {
     nextValue = 0;
   }
+  std::clog << "JW getCephPoolIdxAndIncrease : res: " << res << " " << nextValue << std::endl;
   g_cephPoolIdx = nextValue;
   return res;
 }
@@ -587,10 +619,12 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
      << file.stripeUnit << ',' << file.objectSize;
   std::string userAtPool = ss.str();
   unsigned int cephPoolIdx = getCephPoolIdxAndIncrease();
+    logwrapper((char*)"JW getRadosStriper : checkAndCreateStriper %s %d", ss.str().c_str(), cephPoolIdx);
   if (checkAndCreateStriper(cephPoolIdx, userAtPool, file) == 0) {
     logwrapper((char*)"getRadosStriper : checkAndCreateStriper failed");
     return 0;
   }
+    logwrapper((char*)"JW getRadosStriper : return striper %d", g_radosStripers[cephPoolIdx][userAtPool]);
   return g_radosStripers[cephPoolIdx][userAtPool];
 }
 
@@ -1038,7 +1072,7 @@ int ceph_posix_stat(XrdOucEnv* env, const char *pathname, struct stat *buf) {
       buf->st_size = 0;
       buf->st_atime = time(NULL);
     } else {
-      return -rc;
+      return -wrapBusyRc(rc);
     }
   }
  // XRootD assumes an 'offline' file if st_dev and st_ino 
