@@ -400,7 +400,7 @@ void translateFileName(std::string &physName, std::string logName){
       logwrapper((char*)"ceph_namelib : failed to translate %s using namelib plugin, using it as is", logName.c_str());
       physName = logName;
     } else {
-      //logwrapper((char*)"ceph_namelib : translated %s to %s", logName.c_str(), physCName);
+      logwrapper((char*)"ceph_namelib : translated %s to %s", logName.c_str(), physCName);
       physName = physCName;
     }
   } else {

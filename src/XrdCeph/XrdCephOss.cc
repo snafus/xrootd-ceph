@@ -136,13 +136,8 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
               hasParms = true;
            }
            // Load name lib
-           if (hasParms) {
-             XrdOucN2NLoader  n2nLoader(&Eroute,configfn,parms,NULL,NULL);
-             g_namelib = n2nLoader.Load(libname.c_str(), XrdVERSIONINFOVAR(XrdOssGetStorageSystem), NULL);
-           } else {
-             XrdOucN2NLoader  n2nLoader(&Eroute,configfn,NULL,NULL,NULL);
-             g_namelib = n2nLoader.Load(libname.c_str(), XrdVERSIONINFOVAR(XrdOssGetStorageSystem), NULL);
-           }
+           XrdOucN2NLoader  n2nLoader(&Eroute,configfn,(hasParms?parms:""),NULL,NULL);
+           g_namelib = n2nLoader.Load(libname.c_str(), XrdVERSIONINFOVAR(XrdOssGetStorageSystem), NULL);
            if (!g_namelib) {
              Eroute.Emsg("Config", "Unable to load library given in ceph.namelib : %s", var);
            }
