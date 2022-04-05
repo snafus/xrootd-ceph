@@ -51,6 +51,9 @@
 #include "XrdCeph/XrdCephPosix.hh"
 
 #include <iostream>
+#include <thread>
+#include <chrono>
+#include <mutex>
 
 /*JW: wrapper to avoid busy commands leaving XrdCeph.
 * If a busy type return code propagates up to here, it should either
@@ -529,6 +532,7 @@ int checkAndCreateStriper(unsigned int cephPoolIdx, std::string &userAtPool, con
   StriperDict::iterator it = sDict.find(userAtPool);
   if (it == sDict.end()) {
     // we need to create a new radosStriper
+      logwrapper((char*)"JW checkAndCreateStriper : radosStriper %s %d %s", userAtPool.c_str(), cephPoolIdx, file.pool.c_str());
     // Get a cluster
     librados::Rados* cluster = checkAndCreateCluster(cephPoolIdx, file.userId);
     if (0 == cluster) {
@@ -624,7 +628,7 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
     logwrapper((char*)"getRadosStriper : checkAndCreateStriper failed");
     return 0;
   }
-    logwrapper((char*)"JW getRadosStriper : return striper %d", g_radosStripers[cephPoolIdx][userAtPool]);
+    logwrapper((char*)"JW getRadosStriper : return striper [%p]", g_radosStripers[cephPoolIdx][userAtPool]);
   return g_radosStripers[cephPoolIdx][userAtPool];
 }
 
@@ -638,6 +642,7 @@ static librados::IoCtx* getIoCtx(const CephFile& file) {
   if (checkAndCreateStriper(cephPoolIdx, userAtPool, file) == 0) {
     return 0;
   }
+  logwrapper((char*)"JW getIoCtx : ioctx [%p]", ss.str().c_str(), g_ioCtx[cephPoolIdx][userAtPool]);
   return g_ioCtx[cephPoolIdx][userAtPool];
 }
 
@@ -1064,7 +1069,11 @@ int ceph_posix_stat(XrdOucEnv* env, const char *pathname, struct stat *buf) {
     return -EINVAL;
   }
   memset(buf, 0, sizeof(*buf));
+    logwrapper((char*)"JW ceph_stat Pre stat : %s", pathname);
+        std::thread::id this_id = std::this_thread::get_id();
+      logwrapper((char*) "JW ceph_stat thread [%p]", this_id);
   int rc = striper->stat(file.name, (uint64_t*)&(buf->st_size), &(buf->st_atime));
+    logwrapper((char*)"JW ceph_stat Post stat: %s rc: %i", pathname, rc);
   if (rc != 0) {
     // for non existing file. Check that we did not open it for write recently
     // in that case, we return 0 size and current time
