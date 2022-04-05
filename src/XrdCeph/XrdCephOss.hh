@@ -74,6 +74,7 @@ public:
   private:
     bool m_configBufferEnable=false; //! config option for buffering
     size_t m_configBufferSize=16*1024*1024L;  //! Buffer size
+    std::string m_configBufferIOmode = "aio";
     bool m_configReadVEnable=false; //! enable readV decorator
     std::string m_configReadVAlgName="passthrough"; // readV algorithm type
     

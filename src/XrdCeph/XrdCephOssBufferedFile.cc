@@ -50,8 +50,9 @@ extern XrdOucTrace XrdCephTrace;
 
 
 XrdCephOssBufferedFile::XrdCephOssBufferedFile(XrdCephOss *cephoss,XrdCephOssFile *cephossDF, 
-                                                size_t buffersize):
-                  XrdCephOssFile(cephoss), m_cephoss(cephoss), m_xrdOssDF(cephossDF), m_bufsize(buffersize)
+                                                size_t buffersize,const std::string& bufferIOmode):
+                  XrdCephOssFile(cephoss), m_cephoss(cephoss), m_xrdOssDF(cephossDF), m_bufsize(buffersize),
+                  m_bufferIOmode(bufferIOmode)
 {
 
 }
@@ -83,7 +84,16 @@ int XrdCephOssBufferedFile::Open(const char *path, int flags, mode_t mode, XrdOu
   // need the file descriptor, so do it after we know the file is opened (and not just a stat for example)
   std::unique_ptr<IXrdCephBufferData> cephbuffer = std::unique_ptr<IXrdCephBufferData>(new XrdCephBufferDataSimple(m_bufsize));
   // std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_fd));
-  std::unique_ptr<ICephIOAdapter>     cephio     = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterAIORaw(cephbuffer.get(),m_fd));
+  std::unique_ptr<ICephIOAdapter>     cephio;
+  if (m_bufferIOmode == "aio") {
+       cephio = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterAIORaw(cephbuffer.get(),m_fd));
+  } else if (m_bufferIOmode == "io") {
+       cephio = std::unique_ptr<ICephIOAdapter>(new CephIOAdapterRaw(cephbuffer.get(),m_fd));
+  } else {
+        BUFLOG("XrdCephOssBufferedFile: buffer mode needs to be one of aio|io " );
+        m_xrdOssDF->Close();
+        return -EINVAL;
+  }
 
   LOGCEPH( "XrdCephOssBufferedFile::Open: fd: " << m_fd <<  " Buffer created: " << cephbuffer->capacity() );
   m_bufferAlg = std::unique_ptr<IXrdCephBufferAlg>(new XrdCephBufferAlgSimple(std::move(cephbuffer),std::move(cephio),m_fd) );

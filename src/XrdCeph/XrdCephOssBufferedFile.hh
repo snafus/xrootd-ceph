@@ -47,7 +47,8 @@
 class XrdCephOssBufferedFile : virtual public XrdCephOssFile { // XrdOssDF
 
 public:
-  XrdCephOssBufferedFile(XrdCephOss *cephoss,XrdCephOssFile *cephossDF, size_t buffersize); 
+  XrdCephOssBufferedFile(XrdCephOss *cephoss,XrdCephOssFile *cephossDF, size_t buffersize, 
+                          const std::string& bufferIOmode); 
   //explicit XrdCephOssBufferedFile(size_t buffersize); 
   virtual ~XrdCephOssBufferedFile();
   virtual int Open(const char *path, int flags, mode_t mode, XrdOucEnv &env);
@@ -70,6 +71,7 @@ protected:
 
   int m_flags = 0;
   size_t m_bufsize = 16*1024*1024L; // default 16MiB size
+  std::string m_bufferIOmode;
   std::string m_path;
   std::chrono::time_point<std::chrono::system_clock> m_timestart;
   std::atomic<size_t> m_bytesRead    = {0}; /// number of bytes read or written

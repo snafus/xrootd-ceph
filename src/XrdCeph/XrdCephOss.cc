@@ -210,7 +210,20 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
            return 1;
          }
        }
-
+       if (!strncmp(var, "ceph.bufferiomode", 17)) {
+         var = Config.GetWord();
+         if (var) {
+           // Warn in case parameters were givne
+           char parms[1040];
+           if (!Config.GetRest(parms, sizeof(parms)) || parms[0]) {
+             Eroute.Emsg("Config", "readvalgname parameters will be ignored");
+           }
+          m_configBufferIOmode = var; // allowed values would be aio, io
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.bufferiomode in config file", configfn);
+           return 1;
+         }
+       }
 
      } // while
 
@@ -333,7 +346,7 @@ XrdOssDF* XrdCephOss::newFile(const char *tident) {
   }
 
   if (m_configBufferEnable) {
-    xrdCephOssDF = new XrdCephOssBufferedFile(this,xrdCephOssDF, m_configBufferSize);
+    xrdCephOssDF = new XrdCephOssBufferedFile(this,xrdCephOssDF, m_configBufferSize, m_configBufferIOmode);
   }
 
 
