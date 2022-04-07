@@ -20,11 +20,7 @@
 #define CEPHBUFDEBUG 1
 #ifdef CEPHBUFDEBUG
 extern  std::mutex cephbuf_iolock;
-<<<<<<< HEAD
-#define BUFLOG(x) {std::unique_lock<std::mutex>(cephbuf_iolock); std::stringstream _bs;  _bs << x; std::clog << _bs.str() << std::endl;}
-=======
 #define BUFLOG(x) {std::unique_lock<std::mutex>cephbuf_iolock; std::stringstream _bs;  _bs << x; std::clog << _bs.str() << std::endl;}
->>>>>>> origin/bufferedIO
 #else 
 #define BUFLOG(x)
 #endif
