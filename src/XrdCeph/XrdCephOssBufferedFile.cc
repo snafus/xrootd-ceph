@@ -184,6 +184,7 @@ ssize_t XrdCephOssBufferedFile::Read(void *buff, off_t offset, size_t blen) {
   } else {
     LOGCEPH( "XrdCephOssBufferedFile::Read: Read error  fd: " << m_fd << " rc:" << rc  << " off:" << offset << " len:" << blen);
   }
+  // LOGCEPH( "XrdCephOssBufferedFile::Read: Read good  fd: " << m_fd << " rc:" << rc  << " off:" << offset << " len:" << blen);
   return rc;
 }
 
